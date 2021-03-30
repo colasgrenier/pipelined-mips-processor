@@ -4,10 +4,11 @@ ENTITY execute IS
 		read_data_1		: in std_logic_vector(31 downto 0);   -- data from register file.
 		read_data_1		: in std_logic_vector(31 downto 0);   -- data from register file.
 		immediate		: in std_logic_vector(31 downto 0);   -- immediate value from instruction.
-		program_counter	: in std_logic_vector(31 downto 0);   -- next instruction address.
+		program_counter		: in std_logic_vector(31 downto 0);   -- next instruction address.
 		result			: out std_logic_vector(31 downto 0);  -- result of the ALU operation.
 		address			: out std_logic_vector(31 downto 0);  -- computed address.
 		taken			: out std_logic;					  -- indicated whether the branch has been taken.
+		target			: out std_logic_vector(4 downto 0);   -- the target register if there is a write to a register
     );
 END ENTITY;
 
