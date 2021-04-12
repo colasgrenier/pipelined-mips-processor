@@ -33,29 +33,29 @@ BEGIN
 				rFile(to_integer(unsigned(writeAddr))) <= writeData;
 			end if;
 		else if falling_edge(clk) then
-			case I(31 downto 26) is
+			case unsigned(I(31 downto 26)) is
 				--Register operation
-				when "000000" =>
+				when x"00" =>
 				
 				
 				--Jump
-				when "000010" =>
+				when x"02" =>
 				
 				--Jump&Link
-				when "000011" =>
+				when x"03" =>
 				
 				--BEQ
-				when "000100" =>
+				when x"04" =>
 					--Sign extend immediate (?)
 					immediate <= std_logic_vector(resize(signed(I(15 downto 0)), 32));
 				
 				--BNE
-				when "000101" =>
+				when x"05" =>
 					--Sign extend immediate (?)
 					immediate <= std_logic_vector(resize(signed(I(15 downto 0)), 32));
 				
 				--Add Imm
-				when "001000" =>
+				when x"08" =>
 					--Register Rs
 					read_data_1 <= rFile(to_integer(unsigned(I(25 downto 21)));
 					--Sign extended Imm val
@@ -63,35 +63,35 @@ BEGIN
 					execOp <= ;
 				
 				--Set Less Than Imm
-				when "001010" =>
+				when x"0A" =>
 					immediate <= std_logic_vector(resize(signed(I(15 downto 0)), 32));
 				
 				--AND Imm
-				when "001100" =>
+				when x"0C" =>
 					--Zero extend Imm
-					immediate <= rFile(0)(31 downto 16) & I(15 downto 0);
+					immediate <= std_logic_vector(x"00") & I(15 downto 0);
 					
 				
 				--OR Imm
-				when "001101" =>
+				when x"0D" =>
 					--Zero extend Imm
-					immediate <= rFile(0)(31 downto 16) & I(15 downto 0);
+					immediate <= std_logic_vector(x"00") & I(15 downto 0);
 				
 				--XOR Imm
-				when "001110" =>
+				when x"0E" =>
 					--Zero extend Imm
-					immediate <= rFile(0)(31 downto 16) & I(15 downto 0);
+					immediate <= std_logic_vector(x"00") & I(15 downto 0);
 				
 				--Load Upper Imm
-				when "001111" =>
-					immediate <=  I(15 downto 0) & rFile(0)(31 downto 16);
+				when x"0F" =>
+					immediate <=  I(15 downto 0) & std_logic_vector(x"00");
 				
 				--Load Word
-				when "100011" =>
+				when x"23" =>
 					immediate <= std_logic_vector(resize(signed(I(15 downto 0)), 32));
 				
 				--Store Word
-				when "101011" =>
+				when x"2B" =>
 					immediate <= std_logic_vector(resize(signed(I(15 downto 0)), 32));
 					
 				when others =>
