@@ -1,12 +1,14 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 ENTITY execute IS
 	PORT (
-		opcode	   		: in std_logic_vector(4 downto 0);    -- opcode (given by the decode stage).
+	  clock     : in std_logic;
+		opcode	   		: in std_logic_vector(3 downto 0);    -- opcode (given by the decode stage).
 		shamt					: in std_logic_vector(4 downto 0);    -- shift amount (given by the decode stage)
-		funct					: in std_logic_vector(5 downto 0);    -- function (given by the decode stage)
+		funct					: in std_logic_vector(7 downto 0);    -- function (given by the decode stage)
 		read_data_1			: in std_logic_vector(31 downto 0);   -- data from register file.
 		read_data_2			: in std_logic_vector(31 downto 0);   -- data from register file.
 		immediate			: in std_logic_vector(31 downto 0);   -- immediate value from instruction.
@@ -15,7 +17,7 @@ ENTITY execute IS
 		result				: out std_logic_vector(31 downto 0);  -- result of the ALU operation.
 		address				: out std_logic_vector(31 downto 0);  -- computed PC address.
 		taken					: out std_logic;					  -- indicated whether the branch has been taken.
-		target				: out std_logic_vector(4 downto 0);   -- the target register if there is a write to a register
+		target				: out std_logic_vector(4 downto 0)   -- the target register if there is a write to a register
     );
 END ENTITY;
 
@@ -92,7 +94,8 @@ BEGIN
 							ELSE
                             result <= x"0000";
 							END IF;
-
+          WHEN others =>
+            REPORT "CASE ERRORS";
 					END CASE;
 				WHEN x"2" =>
 					-- j instruction.
@@ -148,9 +151,13 @@ BEGIN
 				   -- M[rs+signextendedimmediate]=rt
 				   -- result is the computed address
 				   result <= std_logic_vector(unsigned(read_data_1) + signed(immediate));
+				WHEN others =>
+				  report "Case error";
 				END CASE;
 		END IF;
 	END PROCESS;
 END alu_arch;
+
+
 
 
