@@ -36,33 +36,74 @@ BEGIN
 		END IF;
 		-- We read all registers & send the instruction details to execute on the falling edge.
 		IF falling_edge(clock) THEN
-			CASE instruction(31 downto 26) IS
-				WHEN "0000" =>
-					-- R type instruction.
-					read_data_1 <= register_file_contents(to_integer(unsigned(instruction(25 downto 21))));
-					read_data_2 <= register_file_contents(to_integer(unsigned(instruction(20 downto 16))));
-					target <= instruction(15 downto 11);
-					opcode <= instruction(31 downto 26);
-					shamt <= instruction(10 downto 6);
-					funct <= instruction(5 downto 0);
-				WHEN x"4" | x"5" | x"8" | "" =>
-					-- I type instruction with sign-extension.
-					opcode <= instruction(31 downto 26);
-					read_data_1 <= register_file_contents(to_integer(unsigned(instruction(25 downto 21))));
-					target <= instruction(20 downto 16);
-					immediate <= std_logic_vector(resize(signed(instruction(15 downto 0)), 32));
-				WHEN x"a" | x"c" | x"d" | "001110" =>
-					-- I type instruction with zero-extension.
-					opcode <= instruction(31 downto 26);
-					read_data_1 <= register_file_contents(to_integer(unsigned(instruction(25 downto 21))));
-					target <= instruction(20 downto 16);
-					immediate <= x"0000" & instruction(15 downto 0);
-				WHEN x"2" | x"3" =>
-					-- J type instruction.
-					opcode <= instruction(31 downto 6);
-					immediate <= std_logic_vector(resize(unsigned(I(25 downto 0)), 32));
-			END CASE;
-
+			IF stall_count = 0 THEN
+				-- No stalls are active.
+				CASE instruction(31 downto 26) IS
+					WHEN "0000" =>
+						-- R type instruction.
+						IF execute_target = instruction(25 downto 21) OR execute_target = instruction(20 downto 16) THEN
+							-- If the execute stage is computing a result that will write to one of the read
+							-- registers, stall for three cycles.
+							count := 2;
+							opcode <= "000000";
+							target <= "00000";
+						ELSIF memory_target = instruction(25 downto 21) OR memory_target = instruction(20 downto 16) THEN
+							-- If the memory stage will write to one of the read registers, stall for one cycle.
+							count := 2;
+							opcode <= "000000";
+							target <= "00000";
+						ELSE
+							-- Continue normally.
+							read_data_1 <= register_file_contents(to_integer(unsigned(instruction(25 downto 21))));
+							read_data_2 <= register_file_contents(to_integer(unsigned(instruction(20 downto 16))));
+							target <= instruction(15 downto 11);
+							opcode <= instruction(31 downto 26);
+							shamt <= instruction(10 downto 6);
+							funct <= instruction(5 downto 0);
+						END IF;
+					WHEN x"4" | x"5" | x"8" | "" =>
+						-- I type instruction with sign-extension.
+						IF execute_target = instrution(25 downto 21) THEN
+							-- The execut
+							count := 2;
+							opcode <= "000000";
+							target <= "00000";
+						ELSIF memory_target = instruction(25 downto 21) THEN
+							count := 2;
+							opcode <= "000000";
+							target <= "00000";
+						ELSE
+							opcode <= instruction(31 downto 26);
+							read_data_1 <= register_file_contents(to_integer(unsigned(instruction(25 downto 21))));
+							target <= instruction(20 downto 16);
+							immediate <= std_logic_vector(resize(signed(instruction(15 downto 0)), 32));
+						END IF;
+					WHEN x"a" | x"c" | x"d" | "001110" =>
+						-- I type instruction with zero-extension.
+						IF execute_target = instrution(25 downto 21) THEN
+							-- The execut
+							count := 2;
+							opcode <= "000000";
+							target <= "00000";
+						ELSIF memory_target = instruction(25 downto 21) THEN
+							count := 2;
+							opcode <= "000000";
+							target <= "00000";
+						ELSE
+							opcode <= instruction(31 downto 26);
+							read_data_1 <= register_file_contents(to_integer(unsigned(instruction(25 downto 21))));
+							target <= instruction(20 downto 16);
+							immediate <= x"0000" & instruction(15 downto 0);
+						END IF;
+					WHEN x"2" | x"3" =>
+						-- J type instruction.
+						opcode <= instruction(31 downto 6);
+						immediate <= std_logic_vector(resize(unsigned(I(25 downto 0)), 32));
+				END CASE;
+			ELSE
+				-- Reduce the stall count.
+				count := count - 1;
+			END IF;
 		END IF;
 	END PROCESS;
 END decode_arch;
