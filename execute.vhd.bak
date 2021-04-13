@@ -5,24 +5,23 @@ use ieee.numeric_std.all;
 ENTITY execute IS
 	PORT (
 		opcode	   		: in std_logic_vector(4 downto 0);    -- opcode (given by the decode stage).
-		shamt					: in std_logic_vector(4 downto 0);    -- shift amount (given by the decode stage)
-		funct					: in std_logic_vector(5 downto 0);    -- function (given by the decode stage)
-		read_data_1			: in std_logic_vector(31 downto 0);   -- data from register file.
-		read_data_2			: in std_logic_vector(31 downto 0);   -- data from register file.
-		immediate			: in std_logic_vector(31 downto 0);   -- immediate value from instruction.
-		next_target			: in std_logic_vector(4 downto 0);    -- the target register of the next phase.
-		program_counter	: in std_logic_vector(31 downto 0);   -- next instruction address.
-		result				: out std_logic_vector(31 downto 0);  -- result of the ALU operation.
-		address				: out std_logic_vector(31 downto 0);  -- computed PC address.
-		taken					: out std_logic;					  -- indicated whether the branch has been taken.
-		target				: out std_logic_vector(4 downto 0);   -- the target register if there is a write to a register
+		shamt			: in std_logic_vector(4 downto 0);    -- shift amount (given by the decode stage)
+		funct			: in std_logic_vector(5 downto 0);    -- function (given by the decode stage)
+		read_data_1		: in std_logic_vector(31 downto 0);   -- data from register file.
+		read_data_1		: in std_logic_vector(31 downto 0);   -- data from register file.
+		immediate		: in std_logic_vector(31 downto 0);   -- immediate value from instruction.
+		next_target		: in std_logic_vector(4 downto 0);    -- the target register of the next phase.
+		program_counter		: in std_logic_vector(31 downto 0);   -- next instruction address.
+		result			: out std_logic_vector(31 downto 0);  -- result of the ALU operation.
+		address			: out std_logic_vector(31 downto 0);  -- computed address.
+		taken			: out std_logic;					  -- indicated whether the branch has been taken.
+		target			: out std_logic_vector(4 downto 0);   -- the target register if there is a write to a register
     );
 END ENTITY;
 
 ARCHITECTURE alu_arch OF execute IS
     signal hi   : std_logic_vector(31 downto 0);
     signal lo   : std_logic_vector(31 downto 0);
-
 BEGIN
 	PROCESS(clock)
 	BEGIN
@@ -31,28 +30,25 @@ BEGIN
 			-- all signals are set to 0.
 			result <= x"00000000";
 			address <= x"00000000";
-			taken <= '0';
+			taken <= '1';
 			-- transfer the target register
 			target <= next_target;
-			
-			
 			-- operate depending on opcode.
 			CASE opcode IS
 				WHEN x"0" =>
-					CASE funct IS
+					CASE function IS
 						WHEN x"00" =>
 							-- sll rd = rt << shamt instruction.
-							result <= read_data_2 sll to_integer(unsigned(shamt));
+							result <= read_data_1 sll to_integer(unsigned(shamt));
 						WHEN x"02" =>
 							-- srl rd = rt >> shamt instruction.
-							result <= read_data_2 srl to_integer(unsigned(shamt));
+							result <= read_data_1 srl to_integer(unsigned(shamt));
 						WHEN x"03" =>
 							-- sra rd = rt >>> shamt instruction.
-							result <= read_data_2 sra to_integer(unsigned(shamt));
+							result <= read_data_1 sra to_integer(unsigned(shamt));
 						WHEN x"08" =>
 							-- jr pc=rs instruction.
 							target <= read_data_1;
-							taken <= '1';
 						WHEN x"10" =>
 							-- mfhi rd=hi instruction.
 							result <= hi;
@@ -76,31 +72,28 @@ BEGIN
 						WHEN x"24" =>
 							-- and rd=rs&rt instruction.
 							result <= read_data_1 and read_data_2;
-						WHEN x"25" =>
-							-- or rd=rs|rt instruction.
+						when x"25" =>
+							-- or rd=rs|rd instruction.
 							result <= read_data_1 or read_data_2;
-						when x"26" =>
-							-- xor rd=rs^rd instruction.
-							result <= read_data_1 xor read_data_2;
 						WHEN x"27" =>
 							-- nor rd=~(rs|rd) instruction.
 							result <= read_data_1 nor read_data_2;
 						WHEN x"2a" =>
 							-- slt rd=(rs<rt)?1:0 instruction.
 							IF (to_integer(signed(read_data_1)) < to_integer(signed(read_data_2))) THEN
-                            result <= x"0001";
+                                result <= x"00000001";
 							ELSE
-                            result <= x"0000";
+                                result <= x"00000000";
 							END IF;
 
 					END CASE;
-				WHEN x"2" =>
+				WHEN x"3" =>
 					-- j instruction.
-					address <= program_counter(31 downto 28) & immediate(25 downto 0) & "00";
+					address <= program_counter(31 downto 28) & immediate & "00";
 					taken <= '1';
 				WHEN x"3" =>
 					-- jal instruction.
-					address <= program_counter(31 downto 28) & immediate(25 downto 0) & "00";
+					address <= program_counter(31 downto 28) & immediate & "00";
 					result <= program_counter;
 					taken <= '1';
 				WHEN x"4" =>
@@ -118,25 +111,11 @@ BEGIN
 				WHEN x"8" =>
 					-- addi rt=rs+immediate (sign-extended)
 					result <= std_logic_vector(signed(read_data_1) + signed(immediate));
-				WHEN x"a" =>
-					-- slti rt=rs<immediate (sign-extended) ? 1:0 
-					IF (to_integer(signed(read_data_1)) < to_integer(signed(immediate))) THEN
-							 result <= x"0001";
-					ELSE
-							 result <= x"0000";
-					END IF;
 				WHEN x"c" =>
 					-- andi rt=rs&immediate (zero-extended)
-					result <= read_data_1 and immediate;
-				WHEN x"d" =>
-					-- ori rt=rs|immediate (zero-extended)
-					result <= read_data_1 or immediate;
-				WHEN x"e" =>
-					-- xori rt=rs^immediate (zero-extended)
-					result <= read_data_1 xor immediate;
+					result <= read_data_1 & immediate;
 				WHEN x"f" =>
 					-- <lui> <rt> <immediate> instruction.
-					--rt = {imm,x0000}
 					result <= immediate(15 downto 0) & x"0000";
 				WHEN x"23" =>
 					-- lw instruction.
@@ -144,11 +123,11 @@ BEGIN
 					-- result is the computed address
 					result <= std_logic_vector(unsigned(read_data_1) + signed(immediate));
 				WHEN x"2b" =>
-				   -- sw instruction.
-				   -- M[rs+signextendedimmediate]=rt
-				   -- result is the computed address
-				   result <= std_logic_vector(unsigned(read_data_1) + signed(immediate));
-				END CASE;
+					-- sw instruction.
+                    -- M[rs+signextendedimmediate]=rt
+                    -- result is the computed address
+                    result <= std_logic_vector(unsigned(read_data_1) + signed(immediate));
+			END CASE;
 		END IF;
 	END PROCESS;
 END alu_arch;
