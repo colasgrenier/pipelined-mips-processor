@@ -11,33 +11,33 @@ ENTITY execute IS
 		read_data_1			: in std_logic_vector(31 downto 0);   -- data from register file.
 		read_data_2			: in std_logic_vector(31 downto 0);   -- data from register file.
 		immediate			: in std_logic_vector(31 downto 0);   -- immediate value from instruction.
-		next_target			: in std_logic_vector(4 downto 0);    -- the target register of the next phase.
+		target				: in std_logic_vector(4 downto 0);    -- the target register of the current phase.
 		program_counter	: in std_logic_vector(31 downto 0);   -- next instruction address.
 		result				: out std_logic_vector(31 downto 0);  -- result of the ALU operation.
-		address				: out std_logic_vector(31 downto 0);  -- computed PC address.
-		taken					: out std_logic;					  -- indicated whether the branch has been taken.
-		target				: out std_logic_vector(4 downto 0)   -- the target register if there is a write to a register
+		PC_out				: out std_logic_vector(31 downto 0);  -- computed PC address.
+		branch_taken		: out std_logic;					  		  -- indicated whether the branch has been taken.
+		next_target			: out std_logic_vector(4 downto 0)    -- the target register of the next phase (if there is a write to a register)
     );
 END ENTITY;
 
 ARCHITECTURE alu_arch OF execute IS
     signal hi   : std_logic_vector(31 downto 0);
     signal lo   : std_logic_vector(31 downto 0);
-	 --makes life easier for comparing hex to have 8 bit
-	 signal op	 : std_logic_vector(7 downto 0);
+	 signal op 	 : std_logic_vector(7 downto 0);
 
 BEGIN
 	op <= "00" & opcode;
+	
 	PROCESS(clock)
 	BEGIN
-        -- convention: rs is read_data_1; rt is read_data_2
+      -- convention: rs is read_data_1; rt is read_data_2
 		IF rising_edge(clock) THEN
 			-- all signals are set to 0.
 			result <= x"00000000";
-			address <= x"00000000";
-			taken <= '0';
+			PC_out <= x"00000000";
+			branch_taken <= '0';
 			-- transfer the target register
-			target <= next_target;
+			next_target <= target;
 			
 			
 			-- operate depending on opcode.
@@ -55,8 +55,8 @@ BEGIN
 							result <= std_logic_vector(shift_right(signed(read_data_2), to_integer(unsigned(shamt))));
 						WHEN x"08" =>
 							-- jr pc=rs instruction.
-							address <= read_data_1;
-							taken <= '1';
+							PC_out <= read_data_1;
+							branch_taken <= '1';
 						WHEN x"10" =>
 							-- mfhi rd=hi instruction.
 							result <= hi;
@@ -102,36 +102,34 @@ BEGIN
 				WHEN x"02" =>
 					-- j instruction.
 					--PC = JumpAddress = { PC+4[31:28], address, 2’b0 }
-					address <= std_logic_vector(("+"(unsigned(program_counter), "0100")(31 downto 28)))
+					PC_out <= std_logic_vector(("+"(unsigned(program_counter), "0100")(31 downto 28)))
 								  & immediate(25 downto 0) 
 								  & "00";
-					taken <= '1';
+					branch_taken <= '1';
 				WHEN x"03" =>
 					-- jal instruction.
 					--PC = JumpAddress = { PC+4[31:28], address, 2’b0 }
 					--R[31] = PC+8
-					address <= std_logic_vector(("+"(unsigned(program_counter), "0100")(31 downto 28)))
+					PC_out <= std_logic_vector(("+"(unsigned(program_counter), "0100")(31 downto 28)))
 								  & immediate(25 downto 0) 
 								  & "00";
 					result <= std_logic_vector(unsigned(program_counter) + "1000");
-					taken <= '1';
+					branch_taken <= '1';
 				WHEN x"04" =>
 					-- beq if(rs==rt): pc=pc+4+branchaddr instruction.
 					-- BranchAddr = { 14{immediate[15]}, immediate, 2’b0 }
 					IF read_data_1 = read_data_2 THEN
-						address <= std_logic_vector( unsigned(program_counter) + "0100" + 
+						PC_out <= std_logic_vector( unsigned(program_counter) + "0100" + 
 															  unsigned((immediate(29 downto 0)&"00")));
-						--address <= std_logic_vector(signed(program_counter) + signed(immediate) + "0100");
-						taken <= '1';
+						branch_taken <= '1';
 					END IF;
 				WHEN x"05" =>
 					-- bne if(rs!=rt): pc=pc+4+branchaddr instruction.
 					-- BranchAddr = { 14{immediate[15]}, immediate, 2’b0 }
 					IF read_data_1 /= read_data_2 THEN
-						address <= std_logic_vector( unsigned(program_counter) + "0100" + 
+						PC_out <= std_logic_vector( unsigned(program_counter) + "0100" + 
 															  unsigned((immediate(29 downto 0)&"00")));
-						--address <= std_logic_vector(signed(program_counter) + signed(immediate) + "0100");
-						taken <= '1';
+						branch_taken <= '1';
 					END IF;				
 				WHEN x"08" =>
 					-- addi rt=rs+immediate (sign-extended)
