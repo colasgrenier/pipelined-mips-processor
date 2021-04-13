@@ -2,15 +2,21 @@ ENTITY decode IS
 	PORT (
 		clock				: in std_logic; --Clock
 		instruction			: in std_logic_vector(31 downto 0); --Instruction
-		read_data_1			: out std_logic_vector(31 downto 0); -- data read from the 
-		read_data_2			: out std_logic_vector(31 downto 0);
-		immediate			: out std_logic_vector(31 downto 0);
 		execute_result			: in std_logic_vector(31 downto 0);
 		execute_result_available	: in std_logic;
 		execute_target			: in std_logic_vector(4 downto 0);
 		memory_result			: in std_logic_vector(31 downto 0);
 		memory_result_available		: in std_logic;
 		memory_target			: in std_logic_vector(4 downto 0);
+		read_data_1			: out std_logic_vector(31 downto 0); -- data read from the 
+		read_data_2			: out std_logic_vector(31 downto 0);
+		immediate			: out std_logic_vector(31 downto 0);
+		opcode				: out std_logic_vector(5 downto 0);
+		funct				: out std_logic_vector();
+		shamt				: out std_logic_vector();
+		target 				: out std_logic_vector(4 downto 0);
+		read				: out std_logic;
+		write				: out std_logic;
 	);
 END decode;
 	
