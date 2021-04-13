@@ -5,7 +5,7 @@ use ieee.numeric_std.all;
 ENTITY execute IS
 	PORT (
 	   clock     			: in std_logic;
-		opcode	   		: in std_logic_vector(7 downto 0);    -- opcode (given by the decode stage).
+		opcode	   		: in std_logic_vector(5 downto 0);    -- opcode (given by the decode stage).
 		shamt					: in std_logic_vector(4 downto 0);    -- shift amount (given by the decode stage)
 		funct					: in std_logic_vector(7 downto 0);    -- function (given by the decode stage)
 		read_data_1			: in std_logic_vector(31 downto 0);   -- data from register file.
@@ -23,8 +23,11 @@ END ENTITY;
 ARCHITECTURE alu_arch OF execute IS
     signal hi   : std_logic_vector(31 downto 0);
     signal lo   : std_logic_vector(31 downto 0);
+	 --makes life easier for comparing hex to have 8 bit
+	 signal op	 : std_logic_vector(7 downto 0);
 
 BEGIN
+	op <= "00" & opcode;
 	PROCESS(clock)
 	BEGIN
         -- convention: rs is read_data_1; rt is read_data_2
@@ -38,7 +41,7 @@ BEGIN
 			
 			
 			-- operate depending on opcode.
-			CASE opcode IS
+			CASE op IS
 				WHEN x"00" =>
 					CASE funct IS
 						WHEN x"00" =>
@@ -98,23 +101,36 @@ BEGIN
 						END CASE;
 				WHEN x"02" =>
 					-- j instruction.
-					address <= program_counter(31 downto 28) & immediate(25 downto 0) & "00";
+					--PC = JumpAddress = { PC+4[31:28], address, 2’b0 }
+					address <= std_logic_vector(("+"(unsigned(program_counter), "0100")(31 downto 28)))
+								  & immediate(25 downto 0) 
+								  & "00";
 					taken <= '1';
 				WHEN x"03" =>
 					-- jal instruction.
-					address <= program_counter(31 downto 28) & immediate(25 downto 0) & "00";
-					result <= program_counter;
+					--PC = JumpAddress = { PC+4[31:28], address, 2’b0 }
+					--R[31] = PC+8
+					address <= std_logic_vector(("+"(unsigned(program_counter), "0100")(31 downto 28)))
+								  & immediate(25 downto 0) 
+								  & "00";
+					result <= std_logic_vector(unsigned(program_counter) + "1000");
 					taken <= '1';
 				WHEN x"04" =>
 					-- beq if(rs==rt): pc=pc+4+branchaddr instruction.
-					IF (read_data_1 = read_data_2) THEN
-						address <= std_logic_vector(signed(program_counter) + signed(immediate) + "0100");
+					-- BranchAddr = { 14{immediate[15]}, immediate, 2’b0 }
+					IF read_data_1 = read_data_2 THEN
+						address <= std_logic_vector( unsigned(program_counter) + "0100" + 
+															  unsigned((immediate(29 downto 0)&"00")));
+						--address <= std_logic_vector(signed(program_counter) + signed(immediate) + "0100");
 						taken <= '1';
 					END IF;
 				WHEN x"05" =>
 					-- bne if(rs!=rt): pc=pc+4+branchaddr instruction.
+					-- BranchAddr = { 14{immediate[15]}, immediate, 2’b0 }
 					IF read_data_1 /= read_data_2 THEN
-						address <= std_logic_vector(signed(program_counter) + signed(immediate) + "0100");
+						address <= std_logic_vector( unsigned(program_counter) + "0100" + 
+															  unsigned((immediate(29 downto 0)&"00")));
+						--address <= std_logic_vector(signed(program_counter) + signed(immediate) + "0100");
 						taken <= '1';
 					END IF;				
 				WHEN x"08" =>
