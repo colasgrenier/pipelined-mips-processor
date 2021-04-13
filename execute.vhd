@@ -1,9 +1,16 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 ENTITY execute IS
 	PORT (
-		opcode	   		: in std_logic_vector(4 downto 0);    -- instruction.
+		opcode	   		: in std_logic_vector(4 downto 0);    -- opcode (given by the decode stage).
+		shamt			: in std_logic_vector(4 downto 0);    -- shift amount (given by the decode stage)
+		funct			: in std_logic_vector(5 downto 0);    -- function (given by the decode stage)
 		read_data_1		: in std_logic_vector(31 downto 0);   -- data from register file.
 		read_data_1		: in std_logic_vector(31 downto 0);   -- data from register file.
 		immediate		: in std_logic_vector(31 downto 0);   -- immediate value from instruction.
+		next_target		: in std_logic_vector(4 downto 0);    -- the target register of the next phase.
 		program_counter		: in std_logic_vector(31 downto 0);   -- next instruction address.
 		result			: out std_logic_vector(31 downto 0);  -- result of the ALU operation.
 		address			: out std_logic_vector(31 downto 0);  -- computed address.
@@ -17,13 +24,6 @@ ARCHITECTURE alu_arch OF execute IS
     signal lo   : std_logic_vector(31 downto 0);
 BEGIN
 	PROCESS(clock)
-	opcode <= instruction(31 downto 26);
-	rs <=;
-	rt <=;
-	rd <=;
-	shamt <= ;
-	funct <=;
-	address <= ;
 	BEGIN
         -- convention: rs is read_data_1; rt is read_data_2
 		IF rising_edge(clock) THEN
@@ -31,6 +31,8 @@ BEGIN
 			result <= x"00000000";
 			address <= x"00000000";
 			taken <= '1';
+			-- transfer the target register
+			target <= next_target;
 			-- operate depending on opcode.
 			CASE opcode IS
 				WHEN x"0" =>
@@ -97,26 +99,34 @@ BEGIN
 				WHEN x"4" =>
 					-- beq if(rs==rt): pc=pc+4+branchaddr instruction.
 					IF (read_data_1 = read_data_2) THEN
-						address <= program_counter + immediate;
+						address <= std_logic_vector(unsigned(program_counter) + signed(immediate));
 						taken <= '1';
 					END IF;
 				WHEN x"5" =>
 					-- bne if(rs!=rt): pc=pc+4+branchaddr instruction.
 					IF (read_data_1 /= read_data_2) THEN
-						address <= program_counter + immediate;
+						address <= std_logic_vector(unsigned(program_counter) + signed(immediate));
 						taken <= '1';
 					END IF;				
 				WHEN x"8" =>
-					-- <addi> <rt> <rs> <sign-extended immediate> instruction.
+					-- addi rt=rs+immediate (sign-extended)
+					result <= std_logic_vector(signed(read_data_1) + signed(immediate));
 				WHEN x"c" =>
-					-- <andi> <rt> <rs> <zero-extended immediate> instruction.
+					-- andi rt=rs&immediate (zero-extended)
+					result <= read_data_1 & immediate;
 				WHEN x"f" =>
 					-- <lui> <rt> <immediate> instruction.
+					result <= immediate(15 downto 0) & x"0000";
 				WHEN x"23" =>
 					-- lw instruction.
+					-- rt=M[rs+signextendedimmediate]
+					-- result is the computed address
+					result <= std_logic_vector(unsigned(read_data_1) + signed(immediate));
 				WHEN x"2b" =>
 					-- sw instruction.
-					
+                    -- M[rs+signextendedimmediate]=rt
+                    -- result is the computed address
+                    result <= std_logic_vector(unsigned(read_data_1) + signed(immediate));
 			END CASE;
 		END IF;
 	END PROCESS;
