@@ -1,19 +1,60 @@
 ENTITY decode IS
 	PORT (
-		clk			: in std_logic; --Clock
-		I				: in std_logic_vector(31 downto 0); --Instruction
-		writeAddr	: in std_logic_vector(4 downto 0); --Probably -> writeback when registers separated
-		writeData	: in std_logic_vector(31 downto 0); --^ ditto
-		read_data_1	: out std_logic_vector(31 downto 0); -- data read from the 
-		read_data_2	: out std_logic_vector(31 downto 0);
-		immediate	: out std_logic_vector(31 downto 0);
-		
-		execOp		: out std_logic_vector(2 downto 0);
-		--To add: rest of the control sigs
+		clock				: in std_logic; --Clock
+		instruction			: in std_logic_vector(31 downto 0); --Instruction
+		read_data_1			: out std_logic_vector(31 downto 0); -- data read from the 
+		read_data_2			: out std_logic_vector(31 downto 0);
+		immediate			: out std_logic_vector(31 downto 0);
+		execute_result			: in std_logic_vector(31 downto 0);
+		execute_result_available	: in std_logic;
+		execute_target			: in std_logic_vector(4 downto 0);
+		memory_result			: in std_logic_vector(31 downto 0);
+		memory_result_available		: in std_logic;
+		memory_target			: in std_logic_vector(4 downto 0);
 	);
 END decode;
 
-
+ENTITY register_file IS
+	PORT (
+		clock		: in std_logic;
+		read_address_1	: in std_logic_vector(4 downto 0);
+		read_address_2	: in std_logic_vector(4 downto 0);
+		write_address	: in std_logic_Vector(4 downto 0);
+		write_data	: in std_logic_vector(31 downto 0);
+		read_data_1	: out std_logic_vector(31 downto 0);
+		read_data_2	: out std_logic_vector(31 downto 0);
+	);
+END register_file;
+	
+ARCHITECTURE register_file_arch of register_file IS
+	TYPE register_file_content_type IS ARRAY(31 downto 0) OF std_logic_vector(31 downto 0);
+	SIGNAL register_file_contents	: register_file_content_type;
+BEGIN
+	PROCESS (clock) BEGIN
+		-- Initialize the registers to 0.
+		IF now < 1ps THEN
+			FOR i IN 0 to 31 LOOP
+				register_file_contents(i) <= x"00000000";
+			END LOOP;
+		END IF;
+		-- We write all data on the rising edge.
+		IF rising_edge(clock) THEN
+			IF write_address /= "00000" THEN
+				register_file_contents(to_integer(unsigned(write_address))) <= write_data;
+			END IF;
+		END IF;
+		-- We read all data on the falling edge.
+		IF falling_edge(clock) THEN
+			read_data_1 <= register_file_contents(to_integer(unsigned(read_address_1)));
+			read_data_2 <= register_file_contents(to_integer(unsigned(read_address_2)));
+		END IF;
+	END PROCESS;
+	PROCESS (read_address_1, read_address_2) BEGIN
+		
+	END PROCESS;
+END register_file_arch;
+	
+	
 ARCHITECTURE decArch OF decode IS 
 --31 Registers of 32 bits each
 TYPE REGISTER_MEM IS ARRAY(31 DOWNTO 0) OF STD_LOGIC_VECTOR(31 DOWNTO 0);
@@ -21,11 +62,6 @@ TYPE REGISTER_MEM IS ARRAY(31 DOWNTO 0) OF STD_LOGIC_VECTOR(31 DOWNTO 0);
 SIGNAL rFile : REGISTER_MEM;
 
 BEGIN
-	--Idea: to write in first half read in second, 
-	--we read on falling edge of clock
-	--Though this is kind of stealing write_back's work
-	--Idk, we'll have to decide
-	--I'm guessing we'll separate the register files out so ig this won't be as easy
 	process (clk)
 	begin
 		if rising_edge(clk) then
@@ -100,6 +136,6 @@ BEGIN
 		
 		end if;
 	end process;
-
 END decArch;
+					
 
