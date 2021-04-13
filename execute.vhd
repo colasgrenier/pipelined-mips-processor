@@ -1,12 +1,11 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
 ENTITY execute IS
 	PORT (
-	  clock     : in std_logic;
-		opcode	   		: in std_logic_vector(3 downto 0);    -- opcode (given by the decode stage).
+	   clock     			: in std_logic;
+		opcode	   		: in std_logic_vector(7 downto 0);    -- opcode (given by the decode stage).
 		shamt					: in std_logic_vector(4 downto 0);    -- shift amount (given by the decode stage)
 		funct					: in std_logic_vector(7 downto 0);    -- function (given by the decode stage)
 		read_data_1			: in std_logic_vector(31 downto 0);   -- data from register file.
@@ -40,20 +39,20 @@ BEGIN
 			
 			-- operate depending on opcode.
 			CASE opcode IS
-				WHEN x"0" =>
+				WHEN x"00" =>
 					CASE funct IS
 						WHEN x"00" =>
 							-- sll rd = rt << shamt instruction.
-							result <= read_data_2 sll to_integer(unsigned(shamt));
+							result <= std_logic_vector(shift_left(unsigned(read_data_2), to_integer(unsigned(shamt))));
 						WHEN x"02" =>
 							-- srl rd = rt >> shamt instruction.
-							result <= read_data_2 srl to_integer(unsigned(shamt));
+							result <= std_logic_vector(shift_right(unsigned(read_data_2), to_integer(unsigned(shamt))));
 						WHEN x"03" =>
 							-- sra rd = rt >>> shamt instruction.
-							result <= read_data_2 sra to_integer(unsigned(shamt));
+							result <= std_logic_vector(shift_right(signed(read_data_2), to_integer(unsigned(shamt))));
 						WHEN x"08" =>
 							-- jr pc=rs instruction.
-							target <= read_data_1;
+							address <= read_data_1;
 							taken <= '1';
 						WHEN x"10" =>
 							-- mfhi rd=hi instruction.
@@ -63,8 +62,8 @@ BEGIN
 							result <= lo;
 						WHEN x"18" =>
 							-- mult hi,lo = rs*rt instruction.
-							hi <= std_logic_vector(to_unsigned(to_integer(unsigned(read_data_1))*to_integer(unsigned(read_data_2))))(63 downto 32);
-							lo <= std_logic_vector(to_unsigned(to_integer(unsigned(read_data_1))*to_integer(unsigned(read_data_2))))(31 downto 0);
+							hi <= std_logic_vector("*"(signed(read_data_1),signed(read_data_2)) (63 downto 32));
+							lo <= std_logic_vector("*"(signed(read_data_1),signed(read_data_2)) (31 downto 0));
 						WHEN x"1a" =>
 							-- div lo=rs/rt hi=rs%rt instruction.
 							hi <= std_logic_vector(signed(read_data_1) mod signed(read_data_2));
@@ -74,14 +73,14 @@ BEGIN
 							result <= std_logic_vector(signed(read_data_1) + signed(read_data_2));
 						WHEN x"22" =>
 							-- sub rd=rs-rt  instruction.
-							result <= std_logic_vector(to_unsigned(to_integer(unsigned(read_data_1)) - to_integer(unsigned(read_data_2))));
+							result <= std_logic_vector(signed(read_data_1) - signed(read_data_2));
 						WHEN x"24" =>
 							-- and rd=rs&rt instruction.
 							result <= read_data_1 and read_data_2;
 						WHEN x"25" =>
 							-- or rd=rs|rt instruction.
 							result <= read_data_1 or read_data_2;
-						when x"26" =>
+						WHEN x"26" =>
 							-- xor rd=rs^rd instruction.
 							result <= read_data_1 xor read_data_2;
 						WHEN x"27" =>
@@ -89,55 +88,55 @@ BEGIN
 							result <= read_data_1 nor read_data_2;
 						WHEN x"2a" =>
 							-- slt rd=(rs<rt)?1:0 instruction.
-							IF (to_integer(signed(read_data_1)) < to_integer(signed(read_data_2))) THEN
-                            result <= x"0001";
+							IF signed(read_data_1) < signed(read_data_2) THEN
+                            result <= x"00000001";
 							ELSE
-                            result <= x"0000";
+                            result <= x"00000000";
 							END IF;
-          WHEN others =>
-            REPORT "CASE ERRORS";
-					END CASE;
-				WHEN x"2" =>
+						WHEN OTHERS =>
+							report "CASE ERRORS";
+						END CASE;
+				WHEN x"02" =>
 					-- j instruction.
 					address <= program_counter(31 downto 28) & immediate(25 downto 0) & "00";
 					taken <= '1';
-				WHEN x"3" =>
+				WHEN x"03" =>
 					-- jal instruction.
 					address <= program_counter(31 downto 28) & immediate(25 downto 0) & "00";
 					result <= program_counter;
 					taken <= '1';
-				WHEN x"4" =>
+				WHEN x"04" =>
 					-- beq if(rs==rt): pc=pc+4+branchaddr instruction.
 					IF (read_data_1 = read_data_2) THEN
-						address <= std_logic_vector(unsigned(program_counter) + signed(immediate));
+						address <= std_logic_vector(signed(program_counter) + signed(immediate) + "0100");
 						taken <= '1';
 					END IF;
-				WHEN x"5" =>
+				WHEN x"05" =>
 					-- bne if(rs!=rt): pc=pc+4+branchaddr instruction.
-					IF (read_data_1 /= read_data_2) THEN
-						address <= std_logic_vector(unsigned(program_counter) + signed(immediate));
+					IF read_data_1 /= read_data_2 THEN
+						address <= std_logic_vector(signed(program_counter) + signed(immediate) + "0100");
 						taken <= '1';
 					END IF;				
-				WHEN x"8" =>
+				WHEN x"08" =>
 					-- addi rt=rs+immediate (sign-extended)
 					result <= std_logic_vector(signed(read_data_1) + signed(immediate));
-				WHEN x"a" =>
+				WHEN x"0a" =>
 					-- slti rt=rs<immediate (sign-extended) ? 1:0 
-					IF (to_integer(signed(read_data_1)) < to_integer(signed(immediate))) THEN
-							 result <= x"0001";
+					IF signed(read_data_1) < signed(immediate) THEN
+							 result <= x"00000001";
 					ELSE
-							 result <= x"0000";
+							 result <= x"00000000";
 					END IF;
-				WHEN x"c" =>
+				WHEN x"0c" =>
 					-- andi rt=rs&immediate (zero-extended)
 					result <= read_data_1 and immediate;
-				WHEN x"d" =>
+				WHEN x"0d" =>
 					-- ori rt=rs|immediate (zero-extended)
 					result <= read_data_1 or immediate;
-				WHEN x"e" =>
+				WHEN x"0e" =>
 					-- xori rt=rs^immediate (zero-extended)
 					result <= read_data_1 xor immediate;
-				WHEN x"f" =>
+				WHEN x"0f" =>
 					-- <lui> <rt> <immediate> instruction.
 					--rt = {imm,x0000}
 					result <= immediate(15 downto 0) & x"0000";
@@ -145,12 +144,12 @@ BEGIN
 					-- lw instruction.
 					-- rt=M[rs+signextendedimmediate]
 					-- result is the computed address
-					result <= std_logic_vector(unsigned(read_data_1) + signed(immediate));
+					result <= std_logic_vector(signed(read_data_1) + signed(immediate));
 				WHEN x"2b" =>
 				   -- sw instruction.
 				   -- M[rs+signextendedimmediate]=rt
 				   -- result is the computed address
-				   result <= std_logic_vector(unsigned(read_data_1) + signed(immediate));
+				   result <= std_logic_vector(signed(read_data_1) + signed(immediate));
 				WHEN others =>
 				  report "Case error";
 				END CASE;
