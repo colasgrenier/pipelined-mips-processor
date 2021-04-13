@@ -17,6 +17,8 @@ ENTITY decode IS
 		target 				: out std_logic_vector(4 downto 0);
 		read				: out std_logic;
 		write				: out std_logic;
+		use_execute_result		: out std_logic;
+		use_memory_result		: out std_logic;
 	);
 END decode;
 	
