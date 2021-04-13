@@ -47,11 +47,15 @@ BEGIN
 							count := 2;
 							opcode <= "000000";
 							target <= "00000";
+							read <= '0';
+							write <= '0';
 						ELSIF memory_target = instruction(25 downto 21) OR memory_target = instruction(20 downto 16) THEN
 							-- If the memory stage will write to one of the read registers, stall for one cycle.
 							count := 2;
 							opcode <= "000000";
 							target <= "00000";
+							read <= '0';
+							write <= '0';
 						ELSE
 							-- Continue normally.
 							read_data_1 <= register_file_contents(to_integer(unsigned(instruction(25 downto 21))));
@@ -60,6 +64,8 @@ BEGIN
 							opcode <= instruction(31 downto 26);
 							shamt <= instruction(10 downto 6);
 							funct <= instruction(5 downto 0);
+							read <= '0';
+							write <= '0';
 						END IF;
 					WHEN x"4" | x"5" | x"8" | "" =>
 						-- I type instruction with sign-extension.
@@ -68,32 +74,53 @@ BEGIN
 							count := 2;
 							opcode <= "000000";
 							target <= "00000";
+							read <= '0';
+							write <= '0';
 						ELSIF memory_target = instruction(25 downto 21) THEN
 							count := 2;
 							opcode <= "000000";
 							target <= "00000";
+							read <= '0';
+							write <= '0';
 						ELSE
 							opcode <= instruction(31 downto 26);
 							read_data_1 <= register_file_contents(to_integer(unsigned(instruction(25 downto 21))));
 							target <= instruction(20 downto 16);
 							immediate <= std_logic_vector(resize(signed(instruction(15 downto 0)), 32));
+							read <= '0';
+							write <= '0';
 						END IF;
-					WHEN x"a" | x"c" | x"d" | "001110" =>
+					WHEN x"a" | x"c" | x"d" | "001110" | x"2b" | x"23" =>
 						-- I type instruction with zero-extension.
 						IF execute_target = instrution(25 downto 21) THEN
 							-- The execut
 							count := 2;
 							opcode <= "000000";
 							target <= "00000";
+							read <= '0';
+							write <= '0';
 						ELSIF memory_target = instruction(25 downto 21) THEN
 							count := 2;
 							opcode <= "000000";
 							target <= "00000";
+							read <= '0';
+							write <= '0';
 						ELSE
 							opcode <= instruction(31 downto 26);
 							read_data_1 <= register_file_contents(to_integer(unsigned(instruction(25 downto 21))));
 							target <= instruction(20 downto 16);
 							immediate <= x"0000" & instruction(15 downto 0);
+							IF opcode = x"2b" =>
+								read <= '1';
+								write <= '0';
+							ELSIF opcode = x"23" =>
+								read <= '0';
+								write <= '1';
+							ELSE
+								read <= '0';
+								write <= '0';
+							END IF;
+								
 						END IF;
 					WHEN x"2" | x"3" =>
 						-- J type instruction.
