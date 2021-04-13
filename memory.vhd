@@ -44,13 +44,6 @@ BEGIN
 			ELSIF (memory_write = '1') THEN
 				-- write the vlaue to main memory.
 				memory_contents(to_integer(unsigned(address(12 downto 2)))) <= write_data;
-				-- dump to the memory file
-				file_open(memory_file, "memory.dat", WRITE_MODE);
-				FOR line IN 0 TO 8195 LOOP
-					write(memory_line, memory_contents(line));
-					writeline(memory_file, memory_line);
-				END LOOP;
-				file_close(memory_file);
 				target <= next_target;
 				result <= x"00000000";
 				result_available <= '0';
@@ -66,6 +59,15 @@ BEGIN
 					result_available <= '0';
 				END IF;
 			END IF;
+		ELSIF (falling_edge(clock)) THEN
+				-- dump to the memory file every falling edge of the clock signal.
+				-- not efficient, but minimizes errors.
+				file_open(memory_file, "memory.dat", WRITE_MODE);
+				FOR line IN 0 TO 8195 LOOP
+					write(memory_line, memory_contents(line));
+					writeline(memory_file, memory_line);
+				END LOOP;
+				file_close(memory_file);
 		END IF;
 	END PROCESS;
 END memory_arch;
