@@ -1,35 +1,36 @@
-library STD;
-use STD.textio.all;
-library IEEE;
-use IEEE.std_logic_1164.all; 
-use IEEE.std_logic_textio.all; 
+library std;
+use std.textio.all;
+library ieee;
+use ieee.std_logic_1164.all; 
+use ieee.std_logic_textio.all; 
+use ieee.numeric_std.ALL;
 
 ENTITY memory IS
 	PORT (
 		clock				: in std_logic;
-		next_target			: in std_logic;
-		read				: in std_logic;				-- must read from data memory.
-		write				: in std_logic;				-- must write to data memory.
+		next_target			: in std_logic_vector(4 downto 0);
+		memory_read			: in std_logic;				-- must read from data memory.
+		memory_write			: in std_logic;				-- must write to data memory.
 		address				: in std_logic_vector(31 downto 0);
-		data			: in std_logic_vector(31 downto 0);
+		write_data			: in std_logic_vector(31 downto 0);
 		result				: out std_logic_vector(31 downto 0);
-		result_available	: out std_logic;
-		target				: out std_logic_vector(4 downto 0);	-- target register for hazard detection / forwarding.
+		result_available		: out std_logic;
+		target				: out std_logic_vector(4 downto 0)	-- target register for hazard detection / forwarding.
 	);
-END ENTITY;
+END memory;
 	
 ARCHITECTURE memory_arch OF memory IS
-	TYPE memory_type IS ARRAY(8095 downto 0) OF std_logic_vector(31 downto 0);
+	TYPE memory_type IS ARRAY(8195 downto 0) OF std_logic_vector(31 downto 0);
 	SIGNAL memory_contents: memory_type;
 BEGIN
 	PROCESS (clock)
 		FILE memory_file			: TEXT;
-		VARIABLE memory_line : STRING (31 DOWNTO 0);
+		VARIABLE memory_line 			: LINE;
 		BEGIN
 		-- initialise the memory.
-		IF (NOW < 1ps) THEN
+		IF (NOW < 1 ps) THEN
 			FOR addr IN 0 TO 8095 LOOP
-				memory_contents <= x"00000000";
+				memory_contents(addr) <= x"00000000";
 			END LOOP;
 		END IF;
 		-- actual memory process.
@@ -40,13 +41,13 @@ BEGIN
 				result <= memory_contents(to_integer(unsigned(address(12 downto 2))));
 				result_available <= '1';
 				target <= next_target;
-			ELSE IF (memory_write = '1') THEN
+			ELSIF (memory_write = '1') THEN
 				-- write the vlaue to main memory.
-				memory_contents(to_integer(unsigned(address(12 downto 2)))) <= data;
+				memory_contents(to_integer(unsigned(address(12 downto 2)))) <= write_data;
 				-- dump to the memory file
 				file_open(memory_file, "memory.dat", WRITE_MODE);
-				FOR line IN 0 TO 8095 LOOP
-					write(memory_line, memory_contents(to_integer(unsigned(address(12 downto 2)))));
+				FOR line IN 0 TO 8195 LOOP
+					write(memory_line, memory_contents(line));
 					writeline(memory_file, memory_line);
 				END LOOP;
 				file_close(memory_file);
@@ -54,11 +55,10 @@ BEGIN
 				result <= x"00000000";
 				result_available <= '0';
 			ELSE
-				-- no read and no write, then the result is the read_data_2
-				IF (next_target \= "00000") THEN
-					output <= read_data_2;
+				-- no read and no write, then the result is the input write data.
+				IF next_target /= "00000" THEN
 					target <= next_target;
-					result <= data;
+					result <= write_data;
 					result_available <= '1';
 				ELSE
 					target <= "00000";
@@ -69,4 +69,3 @@ BEGIN
 		END IF;
 	END PROCESS;
 END memory_arch;
-
