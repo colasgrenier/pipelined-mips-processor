@@ -135,7 +135,7 @@ BEGIN
                             inner_result <= x"00000000";
 							END IF;
 						WHEN OTHERS =>
-							report "CASE ERRORS";
+							REPORT "EXECUTE CASE ERRORS (R Instruction)" severity failure;
 						END CASE;
 				WHEN x"02" =>
 					-- j instruction.
@@ -205,7 +205,7 @@ BEGIN
 				   -- result is the computed address
 				   inner_result <= std_logic_vector(signed(operator1) + signed(immediate));
 				WHEN others =>
-				  report "Case error";
+				  REPORT "EXECUTE CASE ERRORS (J/I Instruction)" severity failure;
 				END CASE;
 		END IF;
 	END PROCESS;
