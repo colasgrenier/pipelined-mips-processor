@@ -13,17 +13,17 @@ ENTITY execute IS
 		immediate			: in std_logic_vector(31 downto 0);   -- immediate value from instruction.
 		
 		
-		ex_useEx1			: in std_logic; --control use execute result in port 1
-		ex_useEx2			: in std_logic; --control use execute result in port 2
-		ex_useMem1			: in std_logic; --control use mem result in port 1
-		ex_useMem2			: in std_logic; --control use mem result in port 2
-		mem_useMemIn		: in std_logic; --buffer if mem should use mem result
-		mem_result			: in std_logic_vector(31 downto 0); --result of mem stage (for forwarding)
+		execute_use_1_execute 		: in std_logic; --control use execute result in port 1
+		execute_use_2_execute		: in std_logic; --control use execute result in port 2
+		execute_use_1_memory			: in std_logic; --control use mem result in port 1
+		execute_use_2_memory			: in std_logic; --control use mem result in port 2
+		memory_use_memory_in			: in std_logic; --buffer if mem should use mem result
+		memory_result					: in std_logic_vector(31 downto 0); --result of mem stage (for forwarding)
 		
 		next_target			: in std_logic_vector(4 downto 0);    -- the target register of the next instruction.
 		program_counter	: in std_logic_vector(31 downto 0);   -- next instruction address.
 		
-		mem_useMemOut		: out std_logic;
+		memory_use_memory_out		: out std_logic;
 		
 		result				: out std_logic_vector(31 downto 0);  -- result of the ALU operation. (Inout for forwarding)
 		PC_out				: out std_logic_vector(31 downto 0);  -- computed PC address.
@@ -44,8 +44,8 @@ ARCHITECTURE alu_arch OF execute IS
 	 --signal lastIBranched : std_logic(1 downto 0);
 	 
 	 --Operator 1/2, hold ALU inputs (may be forwarded)
-	 signal oper1: std_logic_vector(31 downto 0);
-	 signal oper2: std_logic_vector(31 downto 0);
+	 signal operator1: std_logic_vector(31 downto 0);
+	 signal operator2: std_logic_vector(31 downto 0);
 	 
 	 
 	 --Can't read from output port, so we'll assign result here
@@ -58,16 +58,16 @@ BEGIN
 	op <= "00" & opcode;
 	
 	--Implement forwarding
-	oper1 <= inner_result when ex_useEx1 = '1' else
-				mem_result when ex_useMem1 = '1' else
+	operator1 <= inner_result when execute_use_1_execute = '1' else
+				memory_result when execute_use_1_memory = '1' else
 				read_data_1;
-	oper2 <= inner_result when ex_useEx2 = '1' else
-				mem_result when ex_useMem2 = '1' else
+	operator2 <= inner_result when execute_use_2_execute = '1' else
+				memory_result when execute_use_2_memory	 = '1' else
 				read_data_2;
 	
 	PROCESS(clock)
 	BEGIN
-      -- convention: rs is read_data_1 (oper1); rt is read_data_2 (oper2)
+      -- convention: rs is read_data_1 (operator1); rt is read_data_2 (operator2)
 		IF rising_edge(clock) THEN
 			-- all signals are set to 0.
 			inner_result <= x"00000000";
@@ -75,7 +75,7 @@ BEGIN
 			branch_taken <= '0';
 			-- transfer the target register
 			target <= next_target;
-			mem_useMemOut <= mem_useMemIn;
+			memory_use_memory_out	 <= memory_use_memory_in;
 			
 			
 			-- operate depending on opcode.
@@ -84,16 +84,16 @@ BEGIN
 					CASE funct IS
 						WHEN x"00" =>
 							-- sll rd = rt << shamt instruction.
-							inner_result <= std_logic_vector(shift_left(unsigned(oper2), to_integer(unsigned(shamt))));
+							inner_result <= std_logic_vector(shift_left(unsigned(operator2), to_integer(unsigned(shamt))));
 						WHEN x"02" =>
 							-- srl rd = rt >> shamt instruction.
-							inner_result <= std_logic_vector(shift_right(unsigned(oper2), to_integer(unsigned(shamt))));
+							inner_result <= std_logic_vector(shift_right(unsigned(operator2), to_integer(unsigned(shamt))));
 						WHEN x"03" =>
 							-- sra rd = rt >>> shamt instruction.
-							inner_result <= std_logic_vector(shift_right(signed(oper2), to_integer(unsigned(shamt))));
+							inner_result <= std_logic_vector(shift_right(signed(operator2), to_integer(unsigned(shamt))));
 						WHEN x"08" =>
 							-- jr pc=rs instruction.
-							PC_out <= oper1;
+							PC_out <= operator1;
 							branch_taken <= '1';
 						WHEN x"10" =>
 							-- mfhi rd=hi instruction.
@@ -103,33 +103,33 @@ BEGIN
 							inner_result <= lo;
 						WHEN x"18" =>
 							-- mult hi,lo = rs*rt instruction.
-							hi <= std_logic_vector("*"(signed(oper1),signed(oper2)) (63 downto 32));
-							lo <= std_logic_vector("*"(signed(oper1),signed(oper2)) (31 downto 0));
+							hi <= std_logic_vector("*"(signed(operator1),signed(operator2)) (63 downto 32));
+							lo <= std_logic_vector("*"(signed(operator1),signed(operator2)) (31 downto 0));
 						WHEN x"1a" =>
 							-- div lo=rs/rt hi=rs%rt instruction.
-							hi <= std_logic_vector(signed(oper1) mod signed(oper2));
-							lo <= std_logic_vector(signed(oper1) / signed(oper2));
+							hi <= std_logic_vector(signed(operator1) mod signed(operator2));
+							lo <= std_logic_vector(signed(operator1) / signed(operator2));
 						WHEN x"20" =>
 							-- add rd=rs+rtinstruction.
-							inner_result <= std_logic_vector(signed(oper1) + signed(oper2));
+							inner_result <= std_logic_vector(signed(operator1) + signed(operator2));
 						WHEN x"22" =>
 							-- sub rd=rs-rt  instruction.
-							inner_result <= std_logic_vector(signed(oper1) - signed(oper2));
+							inner_result <= std_logic_vector(signed(operator1) - signed(operator2));
 						WHEN x"24" =>
 							-- and rd=rs&rt instruction.
-							inner_result <= oper1 and oper2;
+							inner_result <= operator1 and operator2;
 						WHEN x"25" =>
 							-- or rd=rs|rt instruction.
-							inner_result <= oper1 or oper2;
+							inner_result <= operator1 or operator2;
 						WHEN x"26" =>
 							-- xor rd=rs^rd instruction.
-							inner_result <= oper1 xor oper2;
+							inner_result <= operator1 xor operator2;
 						WHEN x"27" =>
 							-- nor rd=~(rs|rd) instruction.
-							inner_result <= oper1 nor oper2;
+							inner_result <= operator1 nor operator2;
 						WHEN x"2a" =>
 							-- slt rd=(rs<rt)?1:0 instruction.
-							IF signed(oper1) < signed(oper2) THEN
+							IF signed(operator1) < signed(operator2) THEN
                             inner_result <= x"00000001";
 							ELSE
                             inner_result <= x"00000000";
@@ -158,7 +158,7 @@ BEGIN
 				WHEN x"04" =>
 					-- beq if(rs==rt): pc=pc+4+branchaddr instruction.
 					-- BranchAddr = { 14{immediate[15]}, immediate, 2’b0 }
-					IF oper1 = oper2 THEN
+					IF operator1 = operator2 THEN
 						PC_out <= std_logic_vector( unsigned(program_counter) + "0100" + 
 															  unsigned((immediate(29 downto 0)&"00")));
 						branch_taken <= '1';
@@ -166,30 +166,30 @@ BEGIN
 				WHEN x"05" =>
 					-- bne if(rs!=rt): pc=pc+4+branchaddr instruction.
 					-- BranchAddr = { 14{immediate[15]}, immediate, 2’b0 }
-					IF oper1 /= oper2 THEN
+					IF operator1 /= operator2 THEN
 						PC_out <= std_logic_vector( unsigned(program_counter) + "0100" + 
 															  unsigned((immediate(29 downto 0)&"00")));
 						branch_taken <= '1';
 					END IF;				
 				WHEN x"08" =>
 					-- addi rt=rs+immediate (sign-extended)
-					inner_result <= std_logic_vector(signed(oper1) + signed(immediate));
+					inner_result <= std_logic_vector(signed(operator1) + signed(immediate));
 				WHEN x"0a" =>
 					-- slti rt=rs<immediate (sign-extended) ? 1:0 
-					IF signed(oper1) < signed(oper2) THEN
+					IF signed(operator1) < signed(immediate) THEN
 							 inner_result <= x"00000001";
 					ELSE
 							 inner_result <= x"00000000";
 					END IF;
 				WHEN x"0c" =>
 					-- andi rt=rs&immediate (zero-extended)
-					inner_result <= oper1 and immediate;
+					inner_result <= operator1 and immediate;
 				WHEN x"0d" =>
 					-- ori rt=rs|immediate (zero-extended)
-					inner_result <= oper1 or immediate;
+					inner_result <= operator1 or immediate;
 				WHEN x"0e" =>
 					-- xori rt=rs^immediate (zero-extended)
-					inner_result <= oper1 xor immediate;
+					inner_result <= operator1 xor immediate;
 				WHEN x"0f" =>
 					-- <lui> <rt> <immediate> instruction.
 					--lui rt = {imm,x0000}
@@ -198,12 +198,12 @@ BEGIN
 					-- lw instruction.
 					-- rt=M[rs+signextendedimmediate]
 					-- result is the computed address
-					inner_result <= std_logic_vector(signed(oper1) + signed(immediate));
+					inner_result <= std_logic_vector(signed(operator1) + signed(immediate));
 				WHEN x"2b" =>
 				   -- sw instruction.
 				   -- M[rs+signextendedimmediate]=rt
 				   -- result is the computed address
-				   inner_result <= std_logic_vector(signed(oper1) + signed(immediate));
+				   inner_result <= std_logic_vector(signed(operator1) + signed(immediate));
 				WHEN others =>
 				  report "Case error";
 				END CASE;
