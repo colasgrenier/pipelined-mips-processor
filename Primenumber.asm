@@ -1,13 +1,13 @@
-addi $2, $0, 270    #A
-addi $3, $0, 192    #B
+li $1, 10 
+li $2, 0 
 
-loop:   beq $2, $0, ENDA
-		addi $0, $0, 0
-        beq $3, $0, ENDB
-        div $2, $3
-        add $2, $0, $3
-        mfhi $3
-        j loop
+addi $3, $0, 1
+addi $4, $0, 2
 
-ENDA:    add $5, $0, $3
-ENDB:    add $6, $0, $2
+loop:
+beq $1,$2,end 
+#do something
+
+addi$2,$1,2 #add1tot1
+j loop # jump back to the top 
+end:
