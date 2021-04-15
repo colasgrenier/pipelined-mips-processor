@@ -5,4 +5,4 @@ LOOP:	SW    $1, 0($1)	# store a word in the address at the address pointed to by
 	ADDI  $1, $1, 4	# increment R1 by 4
 	BEQ   $1, $2, END
 	J     LOOP
-END:	J     LOOP
+END:	J     END
