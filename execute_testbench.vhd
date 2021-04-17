@@ -16,12 +16,19 @@ ARCHITECTURE behavioural OF execute_testbench IS
 		  read_data_1			: in std_logic_vector(31 downto 0);   -- data from register file.
 		  read_data_2			: in std_logic_vector(31 downto 0);   -- data from register file.
 		  immediate			: in std_logic_vector(31 downto 0);   -- immediate value from instruction.
-		  target				: in std_logic_vector(4 downto 0);    -- the target register of the current phase.
+		  
+		  execute_1_use_execute 		: in std_logic; --control use execute result in port 1
+		  execute_2_use_execute		: in std_logic; --control use execute result in port 2
+		  execute_1_use_memory			: in std_logic; --control use mem result in port 1
+		  execute_2_use_memory			: in std_logic; --control use mem result in port 2
+		  memory_result					: in std_logic_vector(31 downto 0); --result of mem stage (for forwarding)
+		
+		  next_target				: in std_logic_vector(4 downto 0);    -- the target register of the current phase.
 		  program_counter	: in std_logic_vector(31 downto 0);   -- next instruction address.
 		  result				: out std_logic_vector(31 downto 0);  -- result of the ALU operation.
-		  PC_out				: out std_logic_vector(31 downto 0);  -- computed PC address.
+		  branch_address : out std_logic_vector(31 downto 0);  -- computed PC address.
 		  branch_taken		: out std_logic;					  		  -- indicated whether the branch has been taken.
-		  next_target			: out std_logic_vector(4 downto 0)    -- the target register of the next phase (if there is a write to a register)
+		  target			: out std_logic_vector(4 downto 0)    -- the target register of the next phase (if there is a write to a register)
     );
   END COMPONENT;
 
@@ -37,10 +44,15 @@ ARCHITECTURE behavioural OF execute_testbench IS
 	SIGNAL etb_rd_1 : std_logic_vector(31 downto 0) := x"00000000";
 	SIGNAL etb_rd_2 : std_logic_vector(31 downto 0) := x"00000000";
 	SIGNAL etb_immediate : std_logic_vector(31 downto 0) := x"00000000";
+	SIGNAL etb_execute_1 : std_logic := '0';
+	SIGNAL etb_execute_2 : std_logic := '0';
+	SIGNAL etb_memory_1 : std_logic := '0';
+	SIGNAL etb_memory_2 : std_logic := '0';
+	SIGNAL etb_memory_result: std_logic_vector(31 downto 0) := x"00000000";
 	SIGNAL etb_target : std_logic_vector(4 downto 0)  := "00000";
 	SIGNAL etb_pc : std_logic_vector(31 downto 0) := x"00000000";
 	SIGNAL etb_result : std_logic_vector(31 downto 0) := x"00000000";
-	SIGNAL etb_pc_out : std_logic_vector(31 downto 0) := x"00000000";
+	SIGNAL etb_branch_address : std_logic_vector(31 downto 0) := x"00000000";
 	SIGNAL etb_branch_taken : std_logic := '0';
 	SIGNAL etb_next_target : std_logic_vector(4 downto 0) := "00000";
 	
@@ -54,10 +66,15 @@ ARCHITECTURE behavioural OF execute_testbench IS
       read_data_1 =>etb_rd_1,
       read_data_2 => etb_rd_2,
       immediate => etb_immediate,
+      execute_1_use_execute => etb_execute_1,
+      execute_2_use_execute => etb_execute_2,
+      execute_1_use_memory => etb_memory_1,
+      execute_2_use_memory => etb_memory_2,
+      memory_result => etb_memory_result,
       target => etb_target,
       program_counter => etb_pc,
       result => etb_result,
-      PC_out => etb_pc_out,
+      branch_address => etb_branch_address,
       branch_taken => etb_branch_taken,
       next_target => etb_next_target
   );
@@ -104,7 +121,7 @@ ARCHITECTURE behavioural OF execute_testbench IS
 		etb_funct <= x"08"; 
 		etb_rd_1 <= x"00000011";
 		WAIT FOR 1*clock_period;
-		ASSERT etb_pc_out = x"00000011" REPORT "BRANCH Error" SEVERITY FAILURE;
+		ASSERT etb_branch_address = x"00000011" REPORT "BRANCH Error" SEVERITY FAILURE;
 		ASSERT etb_branch_taken = '1' REPORT "BRANCH Error" SEVERITY FAILURE;
 		
 		-- Hi
@@ -156,8 +173,107 @@ ARCHITECTURE behavioural OF execute_testbench IS
 		WAIT FOR 1*clock_period;
 		ASSERT etb_result = x"00000001" REPORT "GT Error" SEVERITY FAILURE;
 		
-    
+    -- J instruction
+    etb_opcode <= "00" & x"2";
+    etb_pc <= x"10000011";
+    etb_immediate <= x"00001000";
+    WAIT FOR 1*clock_period;
+    ASSERT etb_branch_taken = '1' REPORT "J Error" SEVERITY FAILURE;
+    ASSERT etb_branch_address = "00010000000000000100000000000000" REPORT "J Error" SEVERITY FAILURE;
+
+    -- JAL instruction
+    etb_opcode <= "00" & x"3";
+    etb_pc <= x"10000011";
+    etb_immediate <= x"00001000";
+    WAIT FOR 1*clock_period;
+    ASSERT etb_branch_taken = '1' REPORT "JAL Error" SEVERITY FAILURE;
+    ASSERT etb_branch_address = "00010000000000000100000000000000" REPORT "JAL Error" SEVERITY FAILURE;    
+    ASSERT etb_result = "00010000000000000000000000011001" REPORT "JAL Error" SEVERITY FAILURE;
 		
+		-- BEQ Fail
+	  etb_opcode <= "00" & x"4";
+		etb_rd_1 <= x"01111111";
+		etb_rd_2 <= x"00000001";
+		etb_pc <= x"10000011";
+    etb_immediate <= x"00001000";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_branch_taken = '0' REPORT "BEQ Fail Error" SEVERITY FAILURE;
+		ASSERT etb_branch_address = x"00000000" REPORT "BEQ Fail Error" SEVERITY FAILURE;
+
+    -- BEQ Success
+	  etb_opcode <= "00" & x"4";
+		etb_rd_1 <= x"00000001";
+		etb_rd_2 <= x"00000001";
+		etb_pc <= x"10000011";
+    etb_immediate <= x"00101000";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_branch_taken = '1' REPORT "BEQ Success Error" SEVERITY FAILURE;
+		ASSERT etb_branch_address = "00010000010000000100000000010101" REPORT "BEQ Success Error" SEVERITY FAILURE;
+		
+		-- BNE
+	  etb_opcode <= "00" & x"5";
+		etb_rd_1 <= x"01111111";
+		etb_rd_2 <= x"00000001";
+		etb_pc <= x"10000011";
+    etb_immediate <= x"00001000";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_branch_taken = '1' REPORT "BNE Error" SEVERITY FAILURE;
+		ASSERT etb_branch_address = "00010000000000000100000000010101" REPORT "BNE Error" SEVERITY FAILURE;
+
+    -- ADDI
+ 	  etb_opcode <= "00" & x"8";
+		etb_rd_1 <= x"01111111";
+    etb_immediate <= x"00001000";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_result = "00000001000100010010000100010001" REPORT "ADDI Error" SEVERITY FAILURE;
+		
+		-- SLTI
+		etb_opcode <= "00" & x"a";
+		etb_rd_1 <= x"00000000";
+		etb_immediate <= x"00001000";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_result = x"00000001" REPORT "ADDI Error" SEVERITY FAILURE;
+		
+		-- ANDI 
+		etb_opcode <= "00" & x"c";
+		etb_rd_1 <= x"00000001";
+		etb_immediate <= x"00001001";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_result = x"00000001" REPORT "ANDI Error" SEVERITY FAILURE;
+		
+		-- ORI 
+		etb_opcode <= "00" & x"d";
+		etb_rd_1 <= x"00100001";
+		etb_immediate <= x"00001000";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_result = x"00101001" REPORT "ORI Error" SEVERITY FAILURE;
+		
+		-- XORI
+		etb_opcode <= "00" & x"e";
+		etb_rd_1 <= x"00000011";
+		etb_immediate <= x"00011001";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_result = x"00011010" REPORT "XORI Error" SEVERITY FAILURE;
+		
+		-- LUI
+		etb_opcode <= "00" & x"f";
+		etb_immediate <= x"00001000";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_result = "00010000000000000000000000000000" REPORT "LUI Error" SEVERITY FAILURE;
+		
+		-- LW
+		etb_opcode <= "100011";
+		etb_rd_1 <= x"00000011";
+		etb_immediate <= x"01001000";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_result = "00000001000000000001000000010001" REPORT "LW Error" SEVERITY FAILURE;
+		
+		-- SW
+		etb_opcode <= "101011";
+		etb_rd_1 <= x"01000011";
+		etb_immediate <= x"00001000";
+		WAIT FOR 1*clock_period;
+		ASSERT etb_result = "00000001000000000001000000010001" REPORT "SW Error" SEVERITY FAILURE;
 		
 	END PROCESS;
 END;

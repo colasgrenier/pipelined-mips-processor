@@ -9,7 +9,12 @@ proc AddWaves {} {
     add wave -position end sim:/execute_testbench/etb_target
     add wave -position end sim:/execute_testbench/etb_pc
     add wave -position end sim:/execute_testbench/etb_result
-    add wave -position end sim:/execute_testbench/etb_pc_out
+    add wave -position end sim:/execute_testbench/etb_branch_address
+    add wave -position end sim:/execute_testbench/etb_execute_1
+    add wave -position end sim:/execute_testbench/etb_execute_2
+    add wave -position end sim:/execute_testbench/etb_memory_1
+    add wave -position end sim:/execute_testbench/etb_memory_2
+    add wave -position end sim:/execute_testbench/etb_memory_result
     add wave -position end sim:/execute_testbench/etb_branch_taken
     add wave -position end sim:/execute_testbench/etb_next_target
 }
