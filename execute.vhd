@@ -7,7 +7,7 @@ ENTITY execute IS
 	   clock     			: in std_logic;
 		opcode	   		: in std_logic_vector(5 downto 0);    -- opcode (given by the decode stage).
 		shamt					: in std_logic_vector(4 downto 0);    -- shift amount (given by the decode stage)
-		funct					: in std_logic_vector(7 downto 0);    -- function (given by the decode stage)
+		funct					: in std_logic_vector(5 downto 0);    -- function (given by the decode stage)
 		read_data_1			: in std_logic_vector(31 downto 0);   -- data from register file.
 		read_data_2			: in std_logic_vector(31 downto 0);   -- data from register file.
 		immediate			: in std_logic_vector(31 downto 0);   -- immediate value from instruction.
@@ -19,13 +19,12 @@ ENTITY execute IS
 		execute_2_use_memory			: in std_logic; --control use mem result in port 2
 		memory_result					: in std_logic_vector(31 downto 0); --result of mem stage (for forwarding)
 		
-		next_target			: in std_logic_vector(4 downto 0);    -- the target register of the next instruction.
 		program_counter	: in std_logic_vector(31 downto 0);   -- next instruction address.
 		
 		result				: out std_logic_vector(31 downto 0);  -- result of the ALU operation.
+		memory_write_data : out std_logic_vector(31 downto 0);  --data to write to memory (just a buffer stage)
 		branch_address		: out std_logic_vector(31 downto 0);  -- computed PC address.
-		branch_taken		: out std_logic;					  		  -- indicated whether the branch has been taken.
-		target				: out std_logic_vector(4 downto 0)    -- the target register of the current phase
+		branch_taken		: out std_logic					  		  -- indicated whether the branch has been taken.
     );
 END ENTITY;
 
@@ -33,8 +32,9 @@ ARCHITECTURE alu_arch OF execute IS
     signal hi   : std_logic_vector(31 downto 0);
     signal lo   : std_logic_vector(31 downto 0);
 	 
-	 --replaces opcode, Helpful in the switch-case for 8 bits
+	 --replaces opcode & funct, Helpful in the switch-case for 8 bits
 	 signal op 	 : std_logic_vector(7 downto 0);
+	 signal func : std_logic_vector(7 downto 0);
 	 
 	 --TODO: use branch_taken to flush first input after branch
 	 
@@ -51,6 +51,7 @@ BEGIN
 	result <= inner_result;
 	
 	op <= "00" & opcode;
+	func <= "00" & funct;
 	
 	--Implement forwarding
 	operator1 <= inner_result when execute_1_use_execute = '1' else
@@ -68,14 +69,15 @@ BEGIN
 			inner_result <= x"00000000";
 			branch_address <= x"00000000";
 			branch_taken <= '0';
-			-- transfer the target register
-			target <= next_target;
+			
+			--Rt, forwarding done in memory stage
+			memory_write_data <= read_data_2; 
 			
 			
 			-- operate depending on opcode.
 			CASE op IS
 				WHEN x"00" =>
-					CASE funct IS
+					CASE func IS
 						WHEN x"00" =>
 							-- sll rd = rt << shamt instruction.
 							inner_result <= std_logic_vector(shift_left(unsigned(operator2), to_integer(unsigned(shamt))));
