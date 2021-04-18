@@ -16,36 +16,73 @@ ENTITY decode IS
 		opcode				: out std_logic_vector(5 downto 0);
 		funct				: out std_logic_vector(5 downto 0);
 		shamt				: out std_logic_vector(4 downto 0);
-		target 				: out std_logic_vector(4 downto 0);
 		memory_read			: out std_logic;
 		memory_write			: out std_logic;
 		execute_1_use_execute		: out std_logic;
 		execute_2_use_execute		: out std_logic;
 		execute_1_use_memory		: out std_logic;
 		execute_2_use_memory		: out std_logic;
-		memory_use_execute		: out std_logic;
 		memory_use_memory		: out std_logic
 	);
 END decode;
 	
 ARCHITECTURE decode_arch of decode IS
 	TYPE register_file_content_type IS ARRAY(31 downto 0) OF std_logic_vector(31 downto 0);
-	SIGNAL register_file			: register_file_content_type;		-- The 32 registers.			-- Counter for stalling.
-	SIGNAL read_address_1			: std_logic_vector(4 downto 0);		-- 
-	SIGNAL read_address_2			: std_logic_vector(4 downto 0);		--
-	SIGNAL execute_target			: std_logic_vector(4 downto 0);		-- The target of the execute stage.
-	SIGNAL execute_result_available_execute	: std_logic;				-- Whether the instruction presently in the execute stage will have its result available in the execute stage.
-	SIGNAL execute_result_available_memory	: std_logic;				-- Whether the instruction presently in the execute stage will completehave its result available in the memory stage (pretty sure this is always the case).
-	SIGNAL memory_target			: std_logic_vector(4 downto 0);		-- The target of the instruction presently in the memory stage
-	SIGNAL memory_use_memory_buffer		: std_logic;				-- Buffer to hold the signal indicating to the memory stage to use the previous result of the memory stage (fowarding).
-	SIGNAL writeback_target			: std_logic_vector(4 downto 0);
-	SIGNAL memory_read_buffer		: std_logic;
-	SIGNAL memory_write_buffer		: std_logic;
+	SIGNAL register_file			: register_file_content_type;
+	SIGNAL execute_target			: std_logic_vector(4 downto 0) := "00000";		-- The target of the execute stage.
+	SIGNAL writeback_target			: std_logic_vector(4 downto 0) := "00000";
+	SIGNAL memory_target			: std_logic_vector(4 downto 0) := "00000";		-- The target of the instruction presently in the memory stage
+	SIGNAL stalling				: std_logic;
+	SIGNAL opcode_buffer			: std_logic_vector(5 downto 0);
+	SIGNAL funct_buffer			: std_logic_vector(5 downto 0);
+	SIGNAL shamt_buffer			: std_logic_vector(4 downto 0);
+	SIGNAL immediate_buffer			: std_logic_vector(31 downto 0);
+	SIGNAL execute_result_available_execute	: std_logic := '0';				-- Whether the instruction presently in the execute stage will have its result available in the execute stage.
+	SIGNAL execute_result_available_memory	: std_logic := '0';				-- Whether the instruction presently in the execute stage will completehave its result available in the memory stage (pretty sure this is always the case).
+	SIGNAL memory_use_memory_delayed_buffer		: std_logic := '0';				-- Buffer to hold the signal indicating to the memory stage to use the previous result of the memory stage (fowarding).
+	SIGNAL memory_use_memory_current_buffer		: std_logic := '0';
+	SIGNAL memory_read_delayed_buffer		: std_logic := '0';
+	SIGNAL memory_write_delayed_buffer		: std_logic := '0';
+	SIGNAL memory_read_current_buffer		: std_logic := '0';
+	SIGNAL memory_write_current_buffer		: std_logic := '0';
+	SIGNAL read_data_1_address		: std_logic_vector(4 downto 0);
+	SIGNAL read_data_2_address		: std_logic_vector(4 downto 0);
 BEGIN
+	PROCESS (stalling) BEGIN
+		IF stalling = '1' THEN
+			opcode <= "000000";
+			funct <= "000000";			
+			shamt <= "0000";
+			immediate <= x"00000000";
+			execute_1_use_execute <= '0';
+			execute_2_use_execute <= '0';
+			execute_1_use_memory <= '0';
+			execute_2_use_memory <= '0';
+			memory_use_memory <= '0';
+			memory_read <= '0';
+			memory_write <= '0';
+			read_data_1 <= x"00000000";
+			read_data_2 <= x"00000000";
+		ELSE
+			opcode <= opcode_buffer;
+			funct <= funct_buffer;
+			shamt <= shamt_buffer;
+			immediate <= immediate_buffer;
+			execute_1_use_execute <= execute_1_use_execute_buffer;
+			execute_2_use_execute <= execute_2_use_execute_buffer;
+			execute_1_use_memory <= execute_1_use_memory_buffer;
+			execute_2_use_memory <= execute_2_use_memory_buffer;
+			memory_use_memory <= memory_use_memory_current_buffer;
+			memory_read <= memory_read_current_buffer;
+			memory_write <= memory_write_current_buffer;
+			read_data_1 <= read_data_1_buffer;
+			read_data_2 <= read_data_2_buffer;
+		END IF;
+	END PROCESS;
 	PROCESS (clock)
 		FILE register_file_file			: TEXT;
 		VARIABLE register_file_line		: LINE;
-		VARIABLE stall_counter			: integer;	
+		VARIABLE stall_counter			: integer := 0;	
 		VARIABLE opcode_v			: std_logic_vector(7 downto 0);
 	BEGIN
 		-- Initialize the registers to 0.
@@ -69,6 +106,95 @@ BEGIN
 			END LOOP;
 			file_close(register_file_file);
 		END IF;
+		-- We process the instruction, check for hazards, etc. on the rising edge.
+		IF rising_edge(clock) THEN
+			IF stalling = '1' THEN
+				-- We are stalling.
+				IF stall_counter > 1 THEN
+					stall_counter := stall_counter - 1;
+				ELSE
+					-- Stall counter is 1.
+					stalling := '0';
+					stall_counter := 0;
+					stall_fetch <= '0';
+				END IF;
+			ELSE
+				-- We are not stalling, check for dependencies.
+				-- Sets signals for hazards/stalling/fowarding.
+				opcode_v := "00" & instruction(31 downto 26);
+				-- The executions move by one.
+				writeback_target <= memory_target;
+				memory_target <= execute_target;
+				-- Shift the buffers.
+				memory_use_memory_current_buffer <= memory_use_memory_buffer;
+				-- Check for dependencies & set signals appropriately.
+				CASE opcode_v IS
+					WHEN x"00" =>
+						-- R type instructions
+						IF (execute_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000") OR (execute_target = instruction(20 downto 16) AND instruction(20 downto 16) /= "00000") THEN
+							-- The execute stage is computing a result that will be written to one of the read register.
+							REPORT "    instr in exec will write to read register";	
+							IF execute_result_available_execute = '1' THEN
+								-- The result will be immediately available as the result of the execute stage.
+								-- Stalling is not necessary.
+								IF execute_target = instruction(25 downto 21) THEN
+									-- The execute stages computes a value that will be written to RS.
+									execute_1_use_execute_buffer <= '1';
+									execute_2_use_execute_buffer <= '0';
+								ELSE
+									-- The execute stages computes a value that will be written to RT.
+									execute_1_use_execute_buffer <= '0';
+									execute_2_use_execute_buffer <= '1';
+								END IF;
+								execute_1_use_memory_buffer <= '0';
+								execute_2_use_memory_buffer <= '0';
+							ELSE
+								-- The result will only be available as the result of the memory stage.
+								-- We need to stall for one cycle.
+								stall_counter := 1;
+								stalling <= '1';
+								IF execute_target = instruction(25 downto 21) THEN
+
+									execute_1_use_memory_buffer <= '1';
+									execute_2_use_memory_buffer <= '0';
+								ELSE
+									execute_1_use_memory_buffer <= '0';
+									execute_2_use_memory_buffer <= '1';
+								END IF;
+								execute_1_use_execute_buffer <= '0';
+								execute_2_use_execute_buffer <= '0';
+							END IF;
+							-- No signal to memory.
+							memory_use_memory_buffer <= '0';
+						ELSIF (memory_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000") OR (memory_target = instruction(20 downto 16) AND instruction(20 downto 16) /= "00000") THEN
+							-- If the memory stage will write to one of the read registers, stall for one cycle.
+							REPORT "    memory stage will write to one of the read registers";
+							IF memory_target = instruction(25 downto 21) THEN
+								execute_1_use_memory_buffer <= '1';
+								execute_2_use_memory_buffer <= '0';
+							ELSE
+								execute_1_use_memory_buffer <= '0';
+								execute_2_use_memory_buffer <= '1';
+							END IF;
+								execute_1_use_execute_buffer <= '0';
+								execute_2_use_execute_buffer <= '0';
+							stall_counter := 1;
+							stalling <= '1';
+						END IF;
+						read_data_1_address <= instruction(25 downto 21);
+						read_data_2_address <= instruction(20 downto 16);
+						execute_target <= instruction(15 downto 11);
+						opcode_buffer <= instruction(31 downto 26);
+						shamt_buffer <= instruction(10 downto 6);
+						funct_buffer <= instruction(5 downto 0);
+				END CASE;
+			END IF;
+		END IF;
+		-- We read registers on the falling edge.
+		IF falling_edge(clock) THEN
+			read_data_1_buffer <= register_file(read_data_1_address);
+			read_data_2_buffer <= register_file(read_data_2_address);
+		END IF;
 		-- We read all registers & send the instruction details to execute on the falling edge.
 		IF falling_edge(clock) THEN
 			-- Set variables for the case.
@@ -82,68 +208,57 @@ BEGIN
 				-- No stalls are active.
 				CASE opcode_v IS
 					WHEN x"00" =>
+						-- Debug
+						REPORT "00 opcode";
 						-- R type instruction.
-						IF execute_target = instruction(25 downto 21) OR execute_target = instruction(20 downto 16) THEN
+						IF (execute_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000") OR (execute_target = instruction(20 downto 16) AND instruction(20 downto 16) /= "00000") THEN
 							-- The execute stage is computing a result that will be written to one of the read register.
+							REPORT "    instr in exec will write to read register";
 							IF execute_result_available_execute = '1' THEN
 								-- The result will be immediately available as the result of the execute stage.
 								-- Stalling is not necessary.
 								IF execute_target = instruction(25 downto 21) THEN
 									-- The execute stages computes a value that will be written to RS.
-									execute_1_use_execute <= '1';
-									execute_2_use_execute <= '0';
+									execute_1_use_execute_buffer <= '1';
 								ELSE
 									-- The execute stages computes a value that will be written to RT.
-									execute_1_use_execute <= '1';
-									execute_2_use_execute <= '0';
+									execute_2_use_execute_buffer <= '1';
 								END IF;
-								execute_1_use_memory <= '0';
-								execute_2_use_memory <= '0';
 							ELSE
 								-- The result will only be available as the result of the memory stage.
 								-- We need to stall for one cycle.
 								stall_counter := 1;
+								stalling := true;
 								IF execute_target = instruction(25 downto 21) THEN
-									execute_1_use_memory <= '1';
+									execute_1_use_memory_buffer <= '1';
 								ELSE
-									execute_2_use_memory <= '1';
+									execute_2_use_memory_buffer <= '1';
 								END IF;
-								execute_1_use_execute <= '0';
-								execute_2_use_execute <= '0';
 							END IF;
-							opcode <= "000000";
-							target <= "00000";
-							memory_read_buffer <= '0';
-							memory_write_buffer <= '0';
-						ELSIF memory_target = instruction(25 downto 21) OR memory_target = instruction(20 downto 16) THEN
+						ELSIF (memory_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000") OR (memory_target = instruction(20 downto 16) AND instruction(20 downto 16) /= "00000") THEN
 							-- If the memory stage will write to one of the read registers, stall for one cycle.
+							REPORT "    memory stage will write to one of the read registers";
 							IF memory_target = instruction(25 downto 21) THEN
-								execute_1_use_memory <= '1';
-								execute_2_use_memory <= '0';
+								execute_1_use_memory_buffer <= '1';
 							ELSE
-								execute_1_use_memory <= '0';
-								execute_2_use_memory <= '1';
+								execute_2_use_memory_buffer <= '1';
 							END IF;
 							stall_counter := 1;
-							opcode <= "000000";
-							target <= "00000";
-							memory_read_buffer <= '0';
-							memory_write_buffer <= '0';
-							stall_fetch <= '1';
+							stalling := true;
 						ELSE
 							-- Continue normally.
+							REPORT "    continuing normally";
 							read_data_1 <= register_file(to_integer(unsigned(instruction(25 downto 21))));
 							read_data_2 <= register_file(to_integer(unsigned(instruction(20 downto 16))));
-							target <= instruction(15 downto 11);
-							opcode <= instruction(31 downto 26);
-							shamt <= instruction(10 downto 6);
-							funct <= instruction(5 downto 0);
-							memory_read <= '0';
-							memory_write <= '0';
+							-- TODO PUT TARGET HERE
+							opcode_buffer <= instruction(31 downto 26);
+							shamt_buffer <= instruction(10 downto 6);
+							funct_buffer <= instruction(5 downto 0);
 						END IF;
 					WHEN x"23" | x"2b" =>
 						-- Memory instructions LW/SW.
-						IF memory_target = instruction(25 downto 21) THEN
+						REPORT "memory instruction";
+						IF (memory_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000") THEN
 							-- No stalls but we set the line.
 							memory_use_memory_buffer <= '1';
 						ELSE
@@ -152,20 +267,24 @@ BEGIN
 						END IF;
 					WHEN x"04" | x"05" | x"08" =>
 						-- I type instruction with sign-extension.
-						IF execute_target = instruction(25 downto 21) THEN
+						REPORT "i instruction with sign-extension";
+						IF execute_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000" THEN
 							-- The execut
+							REPORT "stalling for memory";
 							stall_counter := 2;
 							opcode <= "000000";
 							target <= "00000";
 							memory_read <= '0';
 							memory_write <= '0';
-						ELSIF memory_target = instruction(25 downto 21) THEN
+						ELSIF memory_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000" THEN
+							REPORT "    stalling for memory";
 							stall_counter := 2;
 							opcode <= "000000";
 							target <= "00000";
 							memory_read <= '0';
 							memory_write <= '0';
 						ELSE
+							REPORT "    no hazards";
 							opcode <= instruction(31 downto 26);
 							read_data_1 <= register_file(to_integer(unsigned(instruction(25 downto 21))));
 							target <= instruction(20 downto 16);
@@ -175,19 +294,16 @@ BEGIN
 						END IF;
 					WHEN x"0a" | x"0c" | x"0d" | "00001110" =>
 						-- I type instruction with zero-extension.
-						IF execute_target = instruction(25 downto 21) THEN
+						REPORT "I instruction with zero-extension";
+						IF execute_target = instruction(25 downto 21)  AND instruction(25 downto 21) /= "00000" THEN
 							-- The execut
 							stall_counter := 2;
-							opcode <= "000000";
-							target <= "00000";
-							memory_read <= '0';
-							memory_write <= '0';
-						ELSIF memory_target = instruction(25 downto 21) THEN
+							stalling := true;
+							execute_1_use_execute_buffer <= '1';
+						ELSIF memory_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000" THEN
 							stall_counter := 2;
-							opcode <= "000000";
-							target <= "00000";
-							memory_read <= '0';
-							memory_write <= '0';
+							stalling := true;
+							execute_1_use_memory_buffer <= '1';
 						ELSE
 							opcode <= instruction(31 downto 26);
 							read_data_1 <= register_file(to_integer(unsigned(instruction(25 downto 21))));
@@ -207,16 +323,20 @@ BEGIN
 						END IF;
 					WHEN x"02" | x"03" =>
 						-- J type instruction.
+						REPORT "J extension";
 						opcode <= instruction(31 downto 26);
 						immediate <= std_logic_vector(resize(unsigned(instruction(25 downto 0)), 32));
 					WHEN OTHERS =>
+						REPORT "unknown opcode";
 						REPORT "case error" SEVERITY FAILURE;
 				END CASE;
 			ELSE
+				REPORT "decrementing stall";
 				-- Reduce the stall count.
 				stall_counter := stall_counter - 1;
 				IF stall_counter = 0 THEN
-					stall_fetch <= '0';
+					--stall_fetch <= '0';
+					stalling := false;
 				END IF;
 			END IF;
 		END IF;
