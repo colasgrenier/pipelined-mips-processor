@@ -10,38 +10,39 @@ ENTITY processor IS
 END ENTITY;
 
 ARCHITECTURE processor_arch OF processor IS
-	------------------Component declarations (ew)------------------
+	------------------ Component declarations ------------------
 	COMPONENT fetch PORT (
 		clock		: in std_logic;
 		stall		: in std_logic;				-- whether to continue to the next address or not.
 		branch_taken	: in std_logic;				-- determines whether to branch for the computed address.
 		branch_address	: in std_logic_vector(31 downto 0);	-- computed address for branch.
-		instruction	: out std_logic_vector(31 downto 0)	-- instruction that was read.
+		instruction	: out std_logic_vector(31 downto 0);	-- instruction that was read.
+		program_counter_out : out std_logic_vector(31 downto 0) --current program counter
 	);
 	END COMPONENT;
 	
 	COMPONENT decode PORT (
 		clock				: in std_logic;
-		instruction			: in std_logic_vector(31 downto 0); --Instruction
-		execute_result			: in std_logic_vector(31 downto 0);
-		execute_result_available	: in std_logic;
-		execute_target			: in std_logic_vector(4 downto 0);
-		memory_result			: in std_logic_vector(31 downto 0);
-		memory_result_available		: in std_logic;
-		memory_target			: in std_logic_vector(4 downto 0);
-		read_data_1			: out std_logic_vector(31 downto 0); 
+		instruction			: in std_logic_vector(31 downto 0);
+		write_data			: in std_logic_vector(31 downto 0);
+		stall_fetch			: out std_logic;
+		read_data_1			: out std_logic_vector(31 downto 0);
 		read_data_2			: out std_logic_vector(31 downto 0);
 		immediate			: out std_logic_vector(31 downto 0);
 		opcode				: out std_logic_vector(5 downto 0);
-		funct				: out std_logic_vector();
-		shamt				: out std_logic_vector();
+		funct				: out std_logic_vector(5 downto 0);
+		shamt				: out std_logic_vector(4 downto 0);
 		target 				: out std_logic_vector(4 downto 0);
-		read				: out std_logic;
-		write				: out std_logic;
-		use_execute_result		: out std_logic;
-		use_memory_result		: out std_logic;
+		memory_read			: out std_logic;
+		memory_write			: out std_logic;
+		execute_1_use_execute		: out std_logic;
+		execute_2_use_execute		: out std_logic;
+		execute_1_use_memory		: out std_logic;
+		execute_2_use_memory		: out std_logic;
+		memory_use_memory		: out std_logic
 	);
 	END COMPONENT;
+	
 	
 	COMPONENT execute PORT (
 	   clock     			: in std_logic;
@@ -84,8 +85,10 @@ ARCHITECTURE processor_arch OF processor IS
 	
 	------------------Interconnection Signals------------------
 	
+	
 	--int appended to internal signals
 	SIGNAL branch_taken_int : std_logic;
+	SIGNAL stall_int : std_logic;
 	SIGNAL branch_address_int	: std_logic_vector(31 downto 0);	-- computed address for branch.
 	SIGNAL instruction_int	: std_logic_vector(31 downto 0);	-- instruction
 	
@@ -97,10 +100,11 @@ ARCHITECTURE processor_arch OF processor IS
 	SIGNAL immediate_int		: std_logic_vector(31 downto 0);   -- immediate value from instruction.
 	
 	
-	--SIGNAL execute_1_use_execute_int, execute_2_use_execute_int,
-	--		 execute_1_use_memory_int, execute_2_use_memory_int : std_logic; --forwarding control
+	SIGNAL execute_1_use_execute_int, execute_2_use_execute_int,
+			 execute_1_use_memory_int, execute_2_use_memory_int,
+			 memory_use_memory_int : std_logic; --forwarding control
 	
-	--SIGNAL program_counter_int	: std_logic_vector(31 downto 0);   -- next instruction address.
+	SIGNAL program_counter_int	: std_logic_vector(31 downto 0);   -- next instruction address.
 	
 	SIGNAL memory_result_int		: std_logic_vector(31 downto 0); --result of mem stage (for forwarding)
 	SIGNAL execute_result_int	: std_logic_vector(31 downto 0);  -- result of the ALU operation.
@@ -111,8 +115,7 @@ ARCHITECTURE processor_arch OF processor IS
 	
 	--These signals are buffered by 1
 	--for execute to run before memory
-	SIGNAL memory_read_int1, memory_write_int1,
-			 memory_read_int2, memory_write_int2: std_logic;
+	SIGNAL memory_read_int, memory_write_int : std_logic;
 	SIGNAL memory_write_data_int : std_logic_vector(31 downto 0);
 	
 	--TO IMPLEMENT (signals need ports):
@@ -123,32 +126,34 @@ BEGIN
 	------------------ Instantiations ------------------
 	fetchStage : fetch PORT MAP ( 
 						clock => clock, 
-						stall => ???,
+						stall => stall_int,
 						branch_taken => branch_taken_int,
 						branch_address => branch_address_int,
-						instruction => instruction_int);
+						instruction => instruction_int,
+						program_counter_out => program_counter_int);
 						
 	--I'm going to leave this, the interface seems unfinished
 	decodeStage : decode PORT MAP ( 
+	               --TODO : MEMORY WRITE DATA INTERNAL (read_data_2 buffered by 1)
 						clock => clock, 
 						instruction => instruction_int,
-						execute_result	=> execute_result_int, --Oh I see why this is here, we need to rework execute interface though
-						execute_result_available => ???,
-						execute_target	=> execute_target_int,
-						memory_result => memory_result_int,
-						memory_result_available	=> ???, --Same with this and above
-						memory_target	=> memory_target_int,
-						read_data_1	=> read_data_1_int,
-						read_data_2	=> read_data_2_int,
+						write_data => memory_result_int,
+						writeback_target => memory_target_int,
+						stall_fetch => stall_int,
+						read_data_1 => read_data_1_int,
+						read_data_2 => read_data_2_int,
 						immediate => immediate_int,
 						opcode => opcode_int,
-						funct	=> funct_int,
-						shamt	=> shamt_int,
+						funct => funct_int,
+						shamt => shamt_int,
 						target => decode_target_int,
-						read	=> memory_read_int1,
-						write	=> memory_write_int1,
-						use_execute_result => ???, --If we go with the above version, 
-						use_memory_result	=> ???); --These two signals aren't necessary
+						memory_read => memory_read_int,
+						memory_write => memory_write_int,
+						execute_1_use_execute => execute_1_use_execute_int,
+						execute_2_use_execute => execute_2_use_execute_int,
+						execute_1_use_memory => execute_1_use_memory_int,
+						execute_2_use_memory => execute_2_use_memory_int,
+						memory_use_memory => memory_use_memory_int); --These two signals aren't necessary
 						
 						
 	executeStage : execute PORT MAP ( 
@@ -159,13 +164,13 @@ BEGIN
 						read_data_1 => read_data_1_int,
 						read_data_2 => read_data_2_int,
 						immediate => immediate_int,
-						execute_1_use_execute => ???,
-						execute_2_use_execute => ???,
-						execute_1_use_memory => ???,
-						execute_2_use_memory => ???,
+						execute_1_use_execute => execute_1_use_execute_int,
+						execute_2_use_execute => execute_2_use_execute_int,
+						execute_1_use_memory => execute_1_use_memory_int,
+						execute_2_use_memory => execute_2_use_memory_int,
 						memory_result => memory_result_int,
 						next_target => decode_target_int,
-						program_counter => ???,
+						program_counter => program_counter_int,
 						result => execute_result_int,
 						branch_address => branch_address_int
 						branch_taken => branch_taken_int
@@ -173,6 +178,7 @@ BEGIN
 
 						
 	memoryStage : memory PORT MAP ( 
+						--TODO: add memory_use_memory in control signal
 						clock => clock, 
 						next_target => execute_target_int,
 						memory_read => memory_read_int,
@@ -183,18 +189,6 @@ BEGIN
 						result_available => ???, --Is this to mean the result is MEANINGFUL? But no, 0 read/write is high
 						target => memory_target_int,
 						);
-	
-	------------------ Buffer Registers ------------------
-	--Buffer intermediate registers (wait a clock cycle as execute runs)
-	PROCESS(clock)
-	BEGIN
-      -- convention: rt is read_data_2 (operator2)
-		IF rising_edge(clock) THEN
-			memory_read_int2 <= memory_read_int1;
-			memory_write_int2 <= memory_write_int1;
-			memory_write_data_int <= read_data_2;
-		END IF;
-	END PROCESS;
 
 
 END processor_arch;

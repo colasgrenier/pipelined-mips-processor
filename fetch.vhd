@@ -12,7 +12,8 @@ ENTITY fetch IS
 		stall		: in std_logic;				-- whether to continue to the next address or not.
 		branch_taken	: in std_logic;				-- determines whether to branch for the computed address.
 		branch_address	: in std_logic_vector(31 downto 0);	-- computed address for branch.
-		instruction	: out std_logic_vector(31 downto 0)	-- instruction that was read.
+		instruction	: out std_logic_vector(31 downto 0);	-- instruction that was read.
+		program_counter_out : out std_logic_vector(31 downto 0)
 	);
 END ENTITY;
 
@@ -22,6 +23,7 @@ ARCHITECTURE fetch_arch OF fetch IS
 	SIGNAL program_counter			: std_logic_vector(31 downto 0) := x"00000000";
 	
 BEGIN
+program_counter_out <= program_counter;
 process(clock)
 	-- Initialize the memory.
 	FILE instruction_memory_file		: TEXT;
