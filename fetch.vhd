@@ -27,18 +27,24 @@ process(clock)
 	FILE instruction_memory_file		: TEXT;
 	VARIABLE instruction_memory_line	: LINE;
 	VARIABLE instruction_memory_data	: std_logic_vector(31 downto 0);
-	
+	VARIABLE line				: integer;
 	begin
 	  
 	IF (now < 1 ps) THEN
 		REPORT "initializing instruction memory...";
 		instruction <= x"00000000";
+		-- Initialize everyting to 0, in case the program does not contain 8196 words.
+		FOR line IN 0 to 8195 LOOP
+			instruction_memory_contents(line) <= x"00000000";
+		END LOOP;
+		-- Fill the memory with the contents of the line.
 		file_open(instruction_memory_file, "program.txt", READ_MODE);
-		FOR line IN 0 TO 8195 LOOP
+		line := 0;
+		WHILE NOT endfile(instruction_memory_file) LOOP
 			readline(instruction_memory_file, instruction_memory_line);
 			read(instruction_memory_line, instruction_memory_data);
-			-- report " inst addr cont = " & integer'image(to_integer(unsigned(instruction_memory_data)));
 			instruction_memory_contents(line) <= instruction_memory_data;
+			line := line + 1;
 		END LOOP;
 		file_close(instruction_memory_file);
 		REPORT "instruction memory initialization complete";
