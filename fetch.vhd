@@ -13,17 +13,16 @@ ENTITY fetch IS
 		branch_taken	: in std_logic;				-- determines whether to branch for the computed address.
 		branch_address	: in std_logic_vector(31 downto 0);	-- computed address for branch.
 		instruction	: out std_logic_vector(31 downto 0);	-- instruction that was read.
-		program_counter_out : out std_logic_vector(31 downto 0)
+		program_counter : out std_logic_vector(31 downto 0)
 	);
 END ENTITY;
 
 ARCHITECTURE fetch_arch OF fetch IS
 	TYPE instruction_memory_type		IS ARRAY (8195 downto 0) OF std_logic_vector(31 downto 0);
 	SIGNAL instruction_memory_contents	: instruction_memory_type;
-	SIGNAL program_counter			: std_logic_vector(31 downto 0) := x"00000000";
-	
+	SIGNAL address				: std_logic_vector(31 downto 0) := x"00000000";
 BEGIN
-program_counter_out <= program_counter;
+program_counter <= address;
 process(clock)
 	-- Initialize the memory.
 	FILE instruction_memory_file		: TEXT;
@@ -59,14 +58,14 @@ process(clock)
 		ELSE
 			IF branch_taken = '1' THEN
 				-- the ALU has computed that the branch must be taken.
-				program_counter <= branch_address + 4;
+				address <= branch_address + 4;
 				-- Put the instruction at the next program counter.
 				instruction <= instruction_memory_contents(to_integer(unsigned(branch_address(31 downto 2))));
 			ELSE
 				-- Put the current instruction.
-				instruction <= instruction_memory_contents(to_integer(unsigned(program_counter(31 downto 2))));
+				instruction <= instruction_memory_contents(to_integer(unsigned(address(31 downto 2))));
 				-- No branching, increment the program counter by 4.
-				program_counter <= program_counter + 4;
+				address <= address + 4;
 			END IF;
 		END IF;
 		
