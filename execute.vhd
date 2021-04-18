@@ -22,7 +22,7 @@ ENTITY execute IS
 		next_target			: in std_logic_vector(4 downto 0);    -- the target register of the next instruction.
 		program_counter	: in std_logic_vector(31 downto 0);   -- next instruction address.
 		
-		result				: out std_logic_vector(31 downto 0);  -- result of the ALU operation. (Inout for forwarding)
+		result				: out std_logic_vector(31 downto 0);  -- result of the ALU operation.
 		branch_address		: out std_logic_vector(31 downto 0);  -- computed PC address.
 		branch_taken		: out std_logic;					  		  -- indicated whether the branch has been taken.
 		target				: out std_logic_vector(4 downto 0)    -- the target register of the current phase
