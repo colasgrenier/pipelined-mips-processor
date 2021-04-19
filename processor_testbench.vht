@@ -5,23 +5,29 @@ use ieee.std_logic_1164.all;
 entity processor_testbench is
 end processor_testbench;
 
-architecture tb of processor_testbench is
-    signal clk, reset : std_logic;  -- inputs 
-	 COMPONENT processor PORT (
-        clock       : in std_logic;
-        reset       : in std_logic
-    );
+ARCHITECTURE tb OF processor_testbench IS
+
+	SIGNAL clock : std_logic;
+	SIGNAL reset : std_logic; 
+
+	CONSTANT clock_period	: time := 1 ns;
+
+	COMPONENT processor PORT (
+	        clock       : in std_logic;
+	        reset       : in std_logic
+	    );
 	END COMPONENT;
 begin
 
-    --Generate the clock
-    clock_process : PROCESS 
-    begin
-	    clk <= '0';
-		 wait for 1 ns;
-		 clk <= '1';
-		 wait for 1 ns;
-	 end process;
+	proc : processor PORT MAP (clock => clock, reset => reset);    
 
-	 proc : processor PORT MAP (clock => clk, reset => reset);    
+	--Generate the clock
+	clock_process : PROCESS 
+	begin
+		clock <= '0';
+		wait for clock_period/2;
+		clock <= '1';
+		wait for clock_period/2;
+	end process;
+
 end tb;
