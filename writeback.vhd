@@ -11,6 +11,9 @@ END ENTITY;
 	
 ARCHITECTURE writeback_arch OF writeback IS BEGIN
 	PROCESS (clock) BEGIN
-		result <= input;
+		IF rising_edge(clock) THEN
+			REPORT "writeback: processing";
+			result <= input;
+		END IF;
 	END PROCESS;
 END writeback_arch;
