@@ -76,7 +76,7 @@ BEGIN
 		ELSIF (falling_edge(clock)) THEN
 				-- dump to the memory file every falling edge of the clock signal.
 				-- not efficient, but minimizes errors.
-				file_open(memory_file, "memory.dat", WRITE_MODE);
+				file_open(memory_file, "memory.txt", WRITE_MODE);
 				FOR line IN 0 TO 8191 LOOP
 					write(memory_line, memory_contents(line));
 					writeline(memory_file, memory_line);
