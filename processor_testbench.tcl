@@ -8,6 +8,9 @@ proc AddWaves {} {
 	add wave -position end sim:/processor_testbench/proc/execute_stage/execute_2_use_execute
 	add wave -position end sim:/processor_testbench/proc/execute_stage/execute_1_use_memory
 	add wave -position end sim:/processor_testbench/proc/execute_stage/execute_2_use_memory
+	add wave -position end -dec sim:/processor_testbench/proc/decode_stage/execute_target
+	add wave -position end -dec sim:/processor_testbench/proc/decode_stage/memory_target
+	add wave -position end -dec sim:/processor_testbench/proc/decode_stage/writeback_target
 	add wave -position end -dec sim:/processor_testbench/proc/execute_stage/read_data_1
 	add wave -position end -dec sim:/processor_testbench/proc/execute_stage/read_data_2
 	add wave -position end -dec sim:/processor_testbench/proc/execute_stage/immediate
@@ -17,9 +20,11 @@ proc AddWaves {} {
 	add wave -position end sim:/processor_testbench/proc/memory_stage/memory_read
 	add wave -position end sim:/processor_testbench/proc/memory_stage/memory_write
 	add wave -position end sim:/processor_testbench/proc/memory_stage/memory_use_memory
-	add wave -position end sim:/processor_testbench/proc/memory_stage/memory_use_writeback
+	add wave -position end -dec sim:/processor_testbench/proc/memory_stage/address
+	add wave -position end -dec sim:/processor_testbench/proc/memory_stage/write_data
 	add wave -position end -dec sim:/processor_testbench/proc/memory_stage/result
-	add wave -position end -dec sim:/processor_testbench/proc/writeback_stage/result
+	
+
 }
 
 vlib work
@@ -28,7 +33,6 @@ vcom fetch.vhd
 vcom decode.vhd
 vcom execute.vhd
 vcom memory.vhd
-vcom writeback.vhd
 vcom processor.vhd
 vcom processor_testbench.vht
 

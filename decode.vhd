@@ -121,6 +121,8 @@ BEGIN
 		-- We write to the register file on the rising edge.
 		IF rising_edge(clock) THEN
 			IF writeback_target /= "00000" THEN
+				REPORT "writing to register " & integer'image(to_integer(unsigned(writeback_target))) & 
+				" value " & integer'image(to_integer(signed(write_data)));
 				register_file(to_integer(unsigned(writeback_target))) <= write_data;
 			END IF;
 		END IF;
@@ -262,7 +264,7 @@ BEGIN
 						execute_1_use_memory_buffer <= '0';
 						execute_2_use_memory_buffer <= '0';
 						read_data_1_address <= instruction(25 downto 21);
-						read_data_2_address <= "00000";
+						read_data_2_address <= instruction(20 downto 16);
 						execute_target <= instruction(15 downto 11); --TODO change this
 						opcode_buffer <= instruction(31 downto 26);
 						shamt_buffer <= "00000";
@@ -290,7 +292,7 @@ BEGIN
 						END IF;
 						execute_result_available_execute <= '0';
 						read_data_1_address <= instruction(25 downto 21);
-						read_data_2_address <= "00000";
+						read_data_2_address <= instruction(20 downto 16);
 						execute_target <= instruction(20 downto 16);
 						opcode_buffer <= instruction(31 downto 26);
 						shamt_buffer <= "00000";

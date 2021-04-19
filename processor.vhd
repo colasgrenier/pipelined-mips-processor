@@ -69,18 +69,9 @@ ARCHITECTURE processor_arch OF processor IS
 		memory_read			: in std_logic;				-- must read from data memory.
 		memory_write			: in std_logic;				-- must write to data memory.
 		memory_use_memory 		: in std_logic;		 		--Forwarding control
-		memory_use_writeback 		: in std_logic; 			--Forwarding control
-		writeback_data   		 : in std_logic_vector(31 downto 0);
 		address				: in std_logic_vector(31 downto 0);
 		write_data			: in std_logic_vector(31 downto 0);
 		result				: out std_logic_vector(31 downto 0)
-	);
-	END COMPONENT;
-	
-	COMPONENT writeback PORT (
-		clock		: in std_logic;
-		input		: in std_logic_vector(31 downto 0);
-		result		: out std_logic_vector(31 downto 0)
 	);
 	END COMPONENT;
 	
@@ -132,7 +123,7 @@ BEGIN
 	decode_stage : decode PORT MAP ( 
 						clock => clock, 
 						instruction => instruction,
-						write_data => writeback_result,
+						write_data => memory_result,
 						stall_fetch => stall,
 						read_data_1 => read_data_1,
 						read_data_2 => read_data_2,
@@ -176,17 +167,9 @@ BEGIN
 				memory_read => memory_read,
 				memory_write => memory_write,
 				memory_use_memory => memory_use_memory,
-				memory_use_writeback => memory_use_writeback,
-				writeback_data => writeback_result,
 				address => execute_result,
 				write_data => memory_write_data,
 				result => memory_result
-			);
-						
-	writeback_stage : writeback PORT MAP (
-				clock => clock, 
-				input => memory_result,
-				result => writeback_result
 			);
 
 

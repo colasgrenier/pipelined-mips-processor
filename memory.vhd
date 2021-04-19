@@ -12,8 +12,6 @@ ENTITY memory IS
 		memory_write		: in std_logic;				-- must write to data memory.
 		
 		memory_use_memory 	: in std_logic; --Forwarding control
-		memory_use_writeback : in std_logic; --Forwarding control
-		writeback_data    	: in std_logic_vector(31 downto 0); --Forwarding data
 		
 		address				: in std_logic_vector(31 downto 0);
 		write_data			: in std_logic_vector(31 downto 0);
@@ -35,7 +33,6 @@ BEGIN
 
 	-- Fowarding control.
 	store_data <= inner_result when memory_use_memory = '1' else
-				     writeback_data when memory_use_writeback = '1' else
 				     write_data;
 
 	-- Permanent connection from inner_result to ouput result

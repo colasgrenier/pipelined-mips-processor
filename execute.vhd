@@ -36,8 +36,6 @@ ARCHITECTURE alu_arch OF execute IS
 	 signal op 	 : std_logic_vector(7 downto 0);
 	 signal func : std_logic_vector(7 downto 0);
 	 
-	 --TODO: use branch_taken to flush first input after branch
-	 
 	 --Operator 1/2, hold ALU inputs (may be forwarded)
 	 signal operator1: std_logic_vector(31 downto 0);
 	 signal operator2: std_logic_vector(31 downto 0);
@@ -69,9 +67,6 @@ BEGIN
 			inner_result <= x"00000000";
 			branch_address <= x"00000000";
 			branch_taken <= '0';
-			
-			--Rt, forwarding done in memory stage
-			memory_write_data <= read_data_2; 
 			
 			
 			-- operate depending on opcode.
@@ -206,6 +201,7 @@ BEGIN
 					-- result is the computed address
 					inner_result <= std_logic_vector(signed(operator1) + signed(immediate));
 					branch_taken <= '0';
+					memory_write_data <= read_data_2; 
 				WHEN others =>
 				  --REPORT "EXECUTE CASE ERRORS (J/I Instruction): opcode is x" & integer'image(to_integer(unsigned(op))) severity failure;
 				END CASE;
