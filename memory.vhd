@@ -33,33 +33,27 @@ ARCHITECTURE memory_arch OF memory IS
 	
 BEGIN
 
+	-- Fowarding control.
 	store_data <= inner_result when memory_use_memory = '1' else
 				     writeback_data when memory_use_writeback = '1' else
 				     write_data;
-	--permanent connection from inner_result to ouput result
-	result <= inner_result;
-					 
-					 
+
+	-- Permanent connection from inner_result to ouput result
+	result <= inner_result;		 
+		
+	-- Read / write process.		 
 	PROCESS (clock)
-		FILE memory_file			: TEXT;
-		VARIABLE memory_line 	: LINE;
-		
-		BEGIN
-		
+		VARIABLE initialized	: boolean := false;		
+	BEGIN
 		-- initialise the memory.
-		IF (NOW < 1 ps) THEN
+		IF (NOW < 1 ps AND NOT initialized) THEN
+			initialized := true;
 			FOR addr IN 0 TO 8191 LOOP
 				memory_contents(addr) <= x"00000000";
 			END LOOP;
 		END IF;
-		
-		
 		-- actual memory process.
 		IF (rising_edge(clock)) THEN
-		
-			--Initialize result
-			inner_result <= x"00000000";
-			
 			IF (memory_read = '1') THEN
 				-- read from main memory then
 				-- result <= memory value.
@@ -71,18 +65,20 @@ BEGIN
 				-- no read and no write, then the result is the execute result.
 				inner_result <= address;
 			END IF;
-			
-			
-		ELSIF (falling_edge(clock)) THEN
-				-- dump to the memory file every falling edge of the clock signal.
-				-- not efficient, but minimizes errors.
-				file_open(memory_file, "memory.txt", WRITE_MODE);
-				FOR line IN 0 TO 8191 LOOP
-					write(memory_line, memory_contents(line));
-					writeline(memory_file, memory_line);
-				END LOOP;
-				file_close(memory_file);
 		END IF;
-		
 	END PROCESS;
+
+	-- Every time the memory contents change, they are dumped to file.
+	PROCESS (memory_contents)
+		FILE memory_file	: TEXT;
+		VARIABLE memory_line 	: LINE;
+	BEGIN
+		file_open(memory_file, "memory.txt", WRITE_MODE);
+		FOR line IN 0 TO 8191 LOOP
+			write(memory_line, memory_contents(line));
+			writeline(memory_file, memory_line);
+		END LOOP;
+		file_close(memory_file);
+	END PROCESS;
+
 END memory_arch;
