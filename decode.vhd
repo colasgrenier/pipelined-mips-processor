@@ -135,6 +135,16 @@ BEGIN
 		END IF;
 		-- We process the instruction, check for hazards, etc. on the rising edge.
 		IF rising_edge(clock) THEN
+			-- The executions move by one.
+			writeback_target <= memory_target;
+			memory_target <= execute_target;
+			-- Shift the buffers.
+			memory_use_memory_current_buffer <= memory_use_memory_delayed_buffer;
+			memory_use_writeback_current_buffer <= memory_use_writeback_delayed_buffer;
+			memory_write_current_buffer <= memory_write_delayed_buffer;
+			memory_read_current_buffer <= memory_read_delayed_buffer;
+			--
+			execute_target <= "00000";
 			IF stalling = '1' THEN
 				-- We are stalling.
 				IF stall_counter > 1 THEN
@@ -145,16 +155,13 @@ BEGIN
 					stall_counter := 0;
 					stall_fetch <= '0';
 				END IF;
+				execute_target <= "00000";
+				memory_use_memory_delayed_buffer <= '0';
+				memory_use_writeback_delayed_buffer <= '0';
 			ELSE
 				-- We are not stalling, check for dependencies.
 				-- Sets signals for hazards/stalling/fowarding.
 				opcode_v := "00" & instruction(31 downto 26);
-				-- The executions move by one.
-				writeback_target <= memory_target;
-				memory_target <= execute_target;
-				-- Shift the buffers.
-				memory_use_memory_current_buffer <= memory_use_memory_delayed_buffer;
-				memory_use_writeback_current_buffer <= memory_use_writeback_delayed_buffer;
 				-- Check for dependencies & set signals appropriately.
 				CASE opcode_v IS
 					WHEN x"00" =>
@@ -211,7 +218,13 @@ BEGIN
 							stall_counter := 1;
 							stalling <= '1';
 							stall_fetch <= '1';
+						ELSE
+							execute_1_use_execute_buffer <= '0';
+							execute_2_use_execute_buffer <= '0';
+							execute_1_use_memory_buffer <= '0';
+							execute_2_use_memory_buffer <= '0';
 						END IF;
+						execute_result_available_execute <= '1';
 						memory_read_delayed_buffer <= '0';
 						memory_write_delayed_buffer <= '0';
 						memory_use_memory_delayed_buffer <= '0';
@@ -243,6 +256,7 @@ BEGIN
 							memory_read_delayed_buffer <= '0';
 							memory_write_delayed_buffer <= '1';
 						END IF;
+						execute_result_available_execute <= '0';
 						execute_1_use_execute_buffer <= '0';
 						execute_2_use_execute_buffer <= '0';
 						execute_1_use_memory_buffer <= '0';
@@ -257,6 +271,11 @@ BEGIN
 					WHEN x"04" | x"05" | x"08" | x"0a" | x"0c" | x"0d" | "00001110" =>
 						-- I type instruction .
 						REPORT "i instruction with sign-extension";
+						IF opcode_v = x"04" THEN
+							REPORT " x04 BEQ";
+						ELSIF opcode_v = x"05" THEN
+							REPORT " x05 BNE";
+						END IF;
 						IF execute_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000" THEN
 							REPORT "    execute use execute";
 							execute_1_use_execute_buffer <= '1';
@@ -269,6 +288,7 @@ BEGIN
 							execute_1_use_memory_buffer <= '1';
 							execute_2_use_memory_buffer <= '0';
 						END IF;
+						execute_result_available_execute <= '0';
 						read_data_1_address <= instruction(25 downto 21);
 						read_data_2_address <= "00000";
 						execute_target <= instruction(20 downto 16);
@@ -277,6 +297,8 @@ BEGIN
 						funct_buffer <= "000000";
 						memory_read_delayed_buffer <= '0';
 						memory_write_delayed_buffer <= '0';
+						memory_use_memory_delayed_buffer <= '0';
+						memory_use_writeback_delayed_buffer <= '0';
 						CASE opcode_v IS
 							WHEN x"04" | x"05" | x"08" =>
 								immediate_buffer <= std_logic_vector(resize(signed(instruction(15 downto 0)), 32));
@@ -286,24 +308,26 @@ BEGIN
 								REPORT "error error 293912931233" SEVERITY FAILURE;
 						END CASE;
 					WHEN x"02" | x"03" =>
-							memory_read_delayed_buffer <= '0';
-							memory_write_delayed_buffer <= '0';
-							execute_1_use_execute_buffer <= '0';
-							execute_2_use_execute_buffer <= '0';
-							execute_1_use_memory_buffer <= '0';
-							execute_2_use_memory_buffer <= '0';
-							memory_use_memory_delayed_buffer <= '0';
-							memory_use_writeback_delayed_buffer <= '0';
-							read_data_1_address <= "00000";
-							read_data_2_address <= "00000";
-							IF opcode_v = x"03" THEN
-								execute_target <= "11111";
-							ELSE
-								execute_target <= "00000";
-							END IF;
-							opcode_buffer <= instruction(31 downto 26);
-							shamt_buffer <= "00000";
-							funct_buffer <= "000000";
+						REPORT "J/JR instruction";
+						execute_result_available_execute <= '0';
+						memory_read_delayed_buffer <= '0';
+						memory_write_delayed_buffer <= '0';
+						execute_1_use_execute_buffer <= '0';
+						execute_2_use_execute_buffer <= '0';
+						execute_1_use_memory_buffer <= '0';
+						execute_2_use_memory_buffer <= '0';
+						memory_use_memory_delayed_buffer <= '0';
+						memory_use_writeback_delayed_buffer <= '0';
+						read_data_1_address <= "00000";
+						read_data_2_address <= "00000";
+						IF opcode_v = x"03" THEN
+							execute_target <= "11111";
+						ELSE
+							execute_target <= "00000";
+						END IF;
+						opcode_buffer <= instruction(31 downto 26);
+						shamt_buffer <= "00000";
+						funct_buffer <= "000000";
 					WHEN OTHERS =>
 						REPORT "invalid opcode" SEVERITY FAILURE;
 				END CASE;
