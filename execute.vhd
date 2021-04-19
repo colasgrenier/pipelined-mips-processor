@@ -77,6 +77,7 @@ BEGIN
 			-- operate depending on opcode.
 			CASE op IS
 				WHEN x"00" =>
+					branch_taken <= '0';
 					CASE func IS
 						WHEN x"00" =>
 							-- sll rd = rt << shamt instruction.
@@ -155,16 +156,14 @@ BEGIN
 					-- beq if(rs==rt): pc=pc+4+branchaddr instruction.
 					-- BranchAddr = { 14{immediate[15]}, immediate, 2’b0 }
 					IF operator1 = operator2 THEN
-						branch_address <= std_logic_vector( unsigned(program_counter) + "0100" + 
-															  unsigned((immediate(29 downto 0)&"00")));
+						branch_address <= std_logic_vector( unsigned(program_counter) +  unsigned((immediate(29 downto 0)&"00")));
 						branch_taken <= '1';
 					END IF;
 				WHEN x"05" =>
 					-- bne if(rs!=rt): pc=pc+4+branchaddr instruction.
 					-- BranchAddr = { 14{immediate[15]}, immediate, 2’b0 }
 					IF operator1 /= operator2 THEN
-						branch_address <= std_logic_vector( unsigned(program_counter) + "0100" + 
-															  unsigned((immediate(29 downto 0)&"00")));
+						branch_address <= std_logic_vector( unsigned(program_counter) +  unsigned((immediate(29 downto 0)&"00")));
 						branch_taken <= '1';
 					END IF;				
 				WHEN x"08" =>
@@ -177,36 +176,42 @@ BEGIN
 					ELSE
 							 inner_result <= x"00000000";
 					END IF;
+					branch_taken <= '0';
 				WHEN x"0c" =>
 					-- andi rt=rs&immediate (zero-extended)
 					inner_result <= operator1 and immediate;
+					branch_taken <= '0';
 				WHEN x"0d" =>
 					-- ori rt=rs|immediate (zero-extended)
 					inner_result <= operator1 or immediate;
+					branch_taken <= '0';
 				WHEN x"0e" =>
 					-- xori rt=rs^immediate (zero-extended)
 					inner_result <= operator1 xor immediate;
+					branch_taken <= '0';
 				WHEN x"0f" =>
 					-- <lui> <rt> <immediate> instruction.
 					--lui rt = {imm,x0000}
 					inner_result <= immediate(15 downto 0) & x"0000";
+					branch_taken <= '0';
 				WHEN x"23" =>
 					-- lw instruction.
 					-- rt=M[rs+signextendedimmediate]
 					-- result is the computed address
 					inner_result <= std_logic_vector(signed(operator1) + signed(immediate));
+					branch_taken <= '0';
 				WHEN x"2b" =>
-				   -- sw instruction.
-				   -- M[rs+signextendedimmediate]=rt
-				   -- result is the computed address
-				   inner_result <= std_logic_vector(signed(operator1) + signed(immediate));
+					-- sw instruction.
+					-- M[rs+signextendedimmediate]=rt
+					-- result is the computed address
+					inner_result <= std_logic_vector(signed(operator1) + signed(immediate));
+					branch_taken <= '0';
 				WHEN others =>
 				  --REPORT "EXECUTE CASE ERRORS (J/I Instruction): opcode is x" & integer'image(to_integer(unsigned(op))) severity failure;
 				END CASE;
 		END IF;
 	END PROCESS;
 END alu_arch;
-
 
 
 
