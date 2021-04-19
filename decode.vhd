@@ -212,6 +212,8 @@ BEGIN
 							stalling <= '1';
 							stall_fetch <= '1';
 						END IF;
+						memory_read_delayed_buffer <= '0';
+						memory_write_delayed_buffer <= '0';
 						memory_use_memory_delayed_buffer <= '0';
 						memory_use_writeback_delayed_buffer <= '0';
 						read_data_1_address <= instruction(25 downto 21);
@@ -233,6 +235,13 @@ BEGIN
 							-- The result is currently in the memory stage. Memory will access it in the writeback stage.
 							memory_use_memory_delayed_buffer <= '0';
 							memory_use_writeback_delayed_buffer <= '1';
+						END IF;
+						IF opcode_v = x"23" THEN
+							memory_read_delayed_buffer <= '1';
+							memory_write_delayed_buffer <= '0';
+						ELSE
+							memory_read_delayed_buffer <= '0';
+							memory_write_delayed_buffer <= '1';
 						END IF;
 						execute_1_use_execute_buffer <= '0';
 						execute_2_use_execute_buffer <= '0';
@@ -260,14 +269,14 @@ BEGIN
 							execute_1_use_memory_buffer <= '1';
 							execute_2_use_memory_buffer <= '0';
 						END IF;
-						memory_use_memory_delayed_buffer <= '0';
-						memory_use_writeback_delayed_buffer <= '1';
 						read_data_1_address <= instruction(25 downto 21);
 						read_data_2_address <= "00000";
 						execute_target <= instruction(20 downto 16);
 						opcode_buffer <= instruction(31 downto 26);
 						shamt_buffer <= "00000";
 						funct_buffer <= "000000";
+						memory_read_delayed_buffer <= '0';
+						memory_write_delayed_buffer <= '0';
 						CASE opcode_v IS
 							WHEN x"04" | x"05" | x"08" =>
 								immediate_buffer <= std_logic_vector(resize(signed(instruction(15 downto 0)), 32));
@@ -277,6 +286,8 @@ BEGIN
 								REPORT "error error 293912931233" SEVERITY FAILURE;
 						END CASE;
 					WHEN x"02" | x"03" =>
+							memory_read_delayed_buffer <= '0';
+							memory_write_delayed_buffer <= '0';
 							execute_1_use_execute_buffer <= '0';
 							execute_2_use_execute_buffer <= '0';
 							execute_1_use_memory_buffer <= '0';
