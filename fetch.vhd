@@ -23,6 +23,7 @@ ARCHITECTURE fetch_arch OF fetch IS
 	SIGNAL instruction_memory_contents	: instruction_memory_type;
 	SIGNAL address				: std_logic_vector(31 downto 0) := x"00000000";
 	SIGNAL instruction_buffer		: std_logic_vector(31 downto 0);
+	SIGNAL	 last_instruction		: std_logic_vector(31 downto 0);
 
 BEGIN
 
@@ -41,6 +42,7 @@ process(clock)
 	VARIABLE stall_counter			: integer := 0;
 	VARIABLE temp				: std_logic_vector(31 downto 0);
 
+
 BEGIN
 	IF (now < 1 ps AND NOT initialized) THEN
 		initialized := true;
@@ -48,14 +50,12 @@ BEGIN
 		instruction_buffer <= x"00000000";
 		-- Initialize everyting to 0, in case the program does not contain 8196 words.
 		FOR line IN 0 to 8195 LOOP
-			REPORT "    " & integer'image(line);
 			instruction_memory_contents(line) <= x"00000000";
 		END LOOP;
 		-- Fill the memory with the contents of the line.
 		file_open(instruction_memory_file, "program.txt", READ_MODE);
 		line := 0;
 		WHILE NOT endfile(instruction_memory_file) LOOP
-			REPORT "    file read " & integer'image(line);
 			readline(instruction_memory_file, instruction_memory_line);
 			read(instruction_memory_line, instruction_memory_data);
 			instruction_memory_contents(line) <= instruction_memory_data;
@@ -65,13 +65,14 @@ BEGIN
 		REPORT "instruction memory initialization complete";
 	END IF;
 
-	-- Execute the request.
+	-- Execute the request  on the rising edge.
 	IF rising_edge(clock) THEN
-		REPORT "fetch: rising edge";
 		-- Check the signals
 		IF stall = '1' THEN
-			-- do nothing, as the decode stage has asked to wait.
+			-- Do nothing, as the decode stage has asked to wait.
+			-- Outputs are kept as they are.
 		ELSE
+			last_instruction <= instruction_buffer;
 			IF stall_counter > 0 THEN
 				REPORT "fetch: stalling";
 				stall_counter := stall_counter - 1;
@@ -79,38 +80,39 @@ BEGIN
 				-- The last instruction was not a branch or jump, we output the next instruction normally.
 				REPORT "fetch: no stalling here " & integer'image(to_integer(unsigned(address)));
 				IF branch_taken = '1' THEN
-					-- the ALU has computed that the branch must be taken.
-					address <= branch_address + 4;
-					-- Put the instruction at the next program counter.
-					instruction_buffer <= instruction_memory_contents(to_integer(unsigned(branch_address(31 downto 2))));
-					temp := instruction_memory_contents(to_integer(unsigned(branch_address(31 downto 2))));
-					IF (temp(31 downto 26) = "000000") AND (temp(5 downto 0) & "00" = x"08") THEN
+					REPORT "fetch: branch taken";
+					IF (instruction_buffer(31 downto 26) = "000000") AND ("00" & instruction_buffer(5 downto 0) = x"08") THEN
 						-- The last instruction was a jr instruction, we insert two nops.
-						REPORT "fetch: last instruction was JR, insert two nops";
+						REPORT "fetch: last instruction was JR, insert two nops (branched)";
 						stall_counter := 1;
 						instruction_buffer <= x"00000000";
-					ELSIF (temp(31 downto 26) & "00" = x"02") OR (temp(31 downto 26) & "00" = x"03") OR (temp(31 downto 26) & "00" = x"04") OR (temp(31 downto 26) & "00" = x"05") THEN
+						address <= branch_address;
+					ELSIF ("00" & instruction_buffer(31 downto 26) = x"02") OR ("00" & instruction_buffer(31 downto 26) = x"03") OR ("00" & instruction_buffer(31 downto 26) = x"04") OR ("00" & instruction_buffer(31 downto 26) = x"05") THEN
 						-- The last instruction was beq/bne/j/jal, we insert two nops.
-						REPORT "fetch: last instruction was BEQ/BNE/J/JAL, insert two nops";
+						REPORT "fetch: last instruction was BEQ/BNE/J/JAL, insert two nops (branched)";
 						stall_counter := 1;
 						instruction_buffer <= x"00000000";
+						address <= branch_address;
+					ELSE
+						REPORT "fetch: instr buf is " & integer'image(to_integer(unsigned(instruction_buffer(31 downto 26))));
+						instruction_buffer <= instruction_memory_contents(to_integer(unsigned(branch_address(31 downto 2))));
+						address <= branch_address + 4;
 					END IF;
 				ELSE
-					-- Put the current instruction.
-					instruction_buffer <= instruction_memory_contents(to_integer(unsigned(address(31 downto 2))));
-					temp := instruction_memory_contents(to_integer(unsigned(address(31 downto 2))));
-					-- No branching, increment the program counter by 4.
-					address <= address + 4;
-					IF (temp(31 downto 26) = "000000") AND (temp(5 downto 0) & "00" = x"08") THEN
+					IF (instruction_buffer(31 downto 26) = "000000") AND ("00" & instruction_buffer(5 downto 0) = x"08") THEN
 						-- The last instruction was a jr instruction, we insert two nops.
-						REPORT "fetch: last instruction was JR, insert two nops";
+						REPORT "fetch: last instruction was JR, insert two nops (nobranch)";
 						stall_counter := 1;
 						instruction_buffer <= x"00000000";
-					ELSIF (temp(31 downto 26) & "00" = x"02") OR (temp(31 downto 26) & "00" = x"03") OR (temp(31 downto 26) & "00" = x"04") OR (temp(31 downto 26) & "00" = x"05") THEN
+					ELSIF ("00" & instruction_buffer(31 downto 26) = x"02") OR ("00" & instruction_buffer(31 downto 26) = x"03") OR ("00" & instruction_buffer(31 downto 26) = x"04") OR ("00" & instruction_buffer(31 downto 26) = x"05") THEN
 						-- The last instruction was beq/bne/j/jal, we insert two nops.
-						REPORT "fetch: last instruction was BEQ/BNE/J/JAL, insert two nops";
+						REPORT "fetch: last instruction was BEQ/BNE/J/JAL, insert two nops (nobranch)";
 						stall_counter := 1;
 						instruction_buffer <= x"00000000";
+					ELSE
+						REPORT "fetch: instr buf is " & integer'image(to_integer(unsigned(instruction_buffer(31 downto 26)))) & " last is " & integer'image(to_integer(unsigned(last_instruction(31 downto 26))));
+						instruction_buffer <= instruction_memory_contents(to_integer(unsigned(address(31 downto 2))));
+						address <= address + 4;
 					END IF;
 				END IF;
 			END IF;
