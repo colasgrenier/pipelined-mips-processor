@@ -57,6 +57,7 @@ BEGIN
 				inner_result <= memory_contents(to_integer(unsigned(address(14 downto 2))));
 			ELSIF (memory_write = '1') THEN
 				-- write the vlaue to main memory.
+				REPORT "memory: writing " & integer'image(to_integer(signed(store_data))) & " to " & integer'image(to_integer(unsigned(address)));
 				memory_contents(to_integer(unsigned(address(14 downto 2)))) <= store_data;
 			ELSE
 				-- no read and no write, then the result is the execute result.
