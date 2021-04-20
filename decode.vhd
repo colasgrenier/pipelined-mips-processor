@@ -107,8 +107,6 @@ BEGIN
 		END IF;
 	END PROCESS;
 	PROCESS (clock)
-		FILE register_file_file			: TEXT;
-		VARIABLE register_file_line		: LINE;
 		VARIABLE stall_counter			: integer := 0;	
 		VARIABLE opcode_v			: std_logic_vector(7 downto 0);
 	BEGIN
@@ -125,15 +123,6 @@ BEGIN
 				" value " & integer'image(to_integer(signed(write_data)));
 				register_file(to_integer(unsigned(writeback_target))) <= write_data;
 			END IF;
-		END IF;
-		-- We write the register file to file every falling edge.
-		IF falling_edge(clock) THEN
-			file_open(register_file_file, "register_file.txt", WRITE_MODE);
-			FOR line IN 0 TO 31 LOOP
-				write(register_file_line, register_file(line));
-				writeline(register_file_file, register_file_line);
-			END LOOP;
-			file_close(register_file_file);
 		END IF;
 		-- We process the instruction, check for hazards, etc. on the rising edge.
 		IF rising_edge(clock) THEN
@@ -168,6 +157,7 @@ BEGIN
 				CASE opcode_v IS
 					WHEN x"00" =>
 						-- R type instructions
+						REPORT "decode: r-instruction funct " & integer'image(to_integer(unsigned(opcode_v))) & " rs=" & integer'image(to_integer(unsigned(instruction(25 downto 21)))) & " rt=" & integer'image(to_integer(unsigned(instruction(20 downto 15)))) & " rd=" & integer'image(to_integer(unsigned(instruction(15 downto 11))));
 						IF (execute_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000") OR (execute_target = instruction(20 downto 16) AND instruction(20 downto 16) /= "00000") THEN
 							-- The execute stage is computing a result that will be written to one of the read register.
 							REPORT "    instr in exec will write to read register";	
@@ -192,7 +182,6 @@ BEGIN
 								stalling <= '1';
 								stall_fetch <= '1';
 								IF execute_target = instruction(25 downto 21) THEN
-
 									execute_1_use_memory_buffer <= '1';
 									execute_2_use_memory_buffer <= '0';
 								ELSE
@@ -239,18 +228,66 @@ BEGIN
 						funct_buffer <= instruction(5 downto 0);
 						immediate_buffer <= std_logic_vector(resize(signed(instruction(25 downto 0)), 32));
 					WHEN x"23" | x"2b" =>
-						-- Memory instructions LW/SW.
-						REPORT "memory instruction";
+						-- Load instruction.
+						REPORT "decode: load";
+						-- We check for hazards and set fowarding for RS.
 						IF (execute_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000") THEN
-							-- Even if the operation in the execute stage is a ALU op, its result will always be available in the
-							-- memory stage.
-							memory_use_memory_delayed_buffer <= '1';
-							memory_use_writeback_delayed_buffer <= '0';
+							-- The execute stage is currently processing and instruction which will write to RS,
+							-- which this instruction will read.
+							IF execute_result_available_execute = '1' THEN
+								-- The RS register is available right away (it is being computed by the ALU as this moment).
+								execute_1_use_execute_buffer <= '1';
+								execute_1_use_memory_buffer <= '0';
+							ELSE
+								-- The value of the RS register is not available right now.
+								-- We need to stall for one cycle.
+								stall_fetch <= '1';
+								stall_counter := 1;
+								stalling <= '1';
+								execute_1_use_execute_buffer <= '0';
+								execute_1_use_memory_buffer <= '1';						
+							END IF;
 						ELSIF (memory_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000") THEN
-							-- The result is currently in the memory stage. Memory will access it in the writeback stage.
-							memory_use_memory_delayed_buffer <= '0';
-							memory_use_writeback_delayed_buffer <= '1';
+							-- The memory stage is currently processing and instruction which will write to RS,
+							-- which this instruction will read.
+							execute_1_use_execute_buffer <= '0';
+							execute_1_use_memory_buffer <= '1';
+						ELSE
+							-- No hazards or fowarding whatsoever for RS.
+							execute_1_use_execute_buffer <= '0';
+							execute_1_use_memory_buffer <= '0';
 						END IF;
+						-- We check for hazards and fowarding for RT is the instruction is store.
+						IF opcode_v = x"2b" THEN
+							-- Store instruction.
+							IF (execute_target = instruction(20 downto 16) AND instruction(20 downto 16) /= "00000") THEN
+								IF execute_result_available_execute = '1' THEN
+									-- The result of the instruction in the execute stage are available right away.
+									execute_2_use_execute_buffer <= '1';
+									execute_2_use_memory_buffer <= '0';
+									memory_use_memory_delayed_buffer <= '0';
+								ELSE
+									-- The result will only be available in the memory stage.
+									execute_2_use_execute_buffer <= '0';
+									execute_2_use_memory_buffer <= '0';
+									memory_use_memory_delayed_buffer <= '1';
+								END IF;
+							ELSIF (memory_target = instruction(20 downto 16) AND instruction(20 downto 16) /= "00000") THEN
+								execute_2_use_execute_buffer <= '0';
+								execute_2_use_memory_buffer <= '1';
+								memory_use_memory_delayed_buffer <= '0';
+							ELSE
+								execute_2_use_execute_buffer <= '0';
+								execute_2_use_memory_buffer <= '0';
+								memory_use_memory_delayed_buffer <= '0';
+							END IF;
+						ELSE
+							-- Load instruction, we never foward execute_2*
+							execute_2_use_execute_buffer <= '0';
+							execute_2_use_memory_buffer <= '0';
+							memory_use_memory_delayed_buffer <= '0';
+						END IF;
+						-- We set the read/write signals appropriately.
 						IF opcode_v = x"23" THEN
 							memory_read_delayed_buffer <= '1';
 							memory_write_delayed_buffer <= '0';
@@ -258,14 +295,17 @@ BEGIN
 							memory_read_delayed_buffer <= '0';
 							memory_write_delayed_buffer <= '1';
 						END IF;
+						-- The result of memory operations is not available in the execute stage.
 						execute_result_available_execute <= '0';
-						execute_1_use_execute_buffer <= '0';
-						execute_2_use_execute_buffer <= '0';
-						execute_1_use_memory_buffer <= '0';
-						execute_2_use_memory_buffer <= '0';
+						-- Set the target if there is one.
+						IF opcode_v = x"23" THEN
+							execute_target <= instruction(20 downto 16);
+						ELSE
+							execute_target <= "00000";
+						END IF;
+						-- Set other control signals.
 						read_data_1_address <= instruction(25 downto 21);
 						read_data_2_address <= instruction(20 downto 16);
-						execute_target <= instruction(15 downto 11); --TODO change this
 						opcode_buffer <= instruction(31 downto 26);
 						shamt_buffer <= "00000";
 						funct_buffer <= "000000";
@@ -289,11 +329,20 @@ BEGIN
 							execute_2_use_execute_buffer <= '0';
 							execute_1_use_memory_buffer <= '1';
 							execute_2_use_memory_buffer <= '0';
+						ELSE
+							execute_1_use_execute_buffer <= '0';
+							execute_2_use_execute_buffer <= '0';
+							execute_1_use_memory_buffer <= '0';
+							execute_2_use_memory_buffer <= '0';
 						END IF;
 						execute_result_available_execute <= '0';
 						read_data_1_address <= instruction(25 downto 21);
 						read_data_2_address <= instruction(20 downto 16);
-						execute_target <= instruction(20 downto 16);
+						IF opcode_v = x"04" OR opcode_v = x"05" THEN
+							execute_target <= "00000";
+						ELSE
+							execute_target <= instruction(20 downto 16);
+						END IF;
 						opcode_buffer <= instruction(31 downto 26);
 						shamt_buffer <= "00000";
 						funct_buffer <= "000000";
@@ -340,5 +389,17 @@ BEGIN
 			read_data_1_buffer <= register_file(to_integer(unsigned(read_data_1_address)));
 			read_data_2_buffer <= register_file(to_integer(unsigned(read_data_2_address)));
 		END IF;
+	END PROCESS;
+	-- We write the registers to file whenever they change.
+	PROCESS (register_file)
+		FILE register_file_file			: TEXT;
+		VARIABLE register_file_line		: LINE;
+	BEGIN
+		file_open(register_file_file, "register_file.txt", WRITE_MODE);
+		FOR line IN 0 TO 31 LOOP
+			write(register_file_line, register_file(line));
+			writeline(register_file_file, register_file_line);
+		END LOOP;
+		file_close(register_file_file);
 	END PROCESS;
 END decode_arch;
