@@ -9,7 +9,7 @@ z2
 cModel Technology
 Z0 dC:/Users/yajal/Downloads/Pipeline_Project/pipelined-mips-processor
 Edecode
-Z1 w1618865226
+Z1 w1618961426
 Z2 DPx4 ieee 16 std_logic_textio 0 22 V5TSK`;aJKC<l]CEg1>mz1
 Z3 DPx4 ieee 11 numeric_std 0 22 :ASDNFgHXf_ih3J@9F3Ze1
 Z4 DPx3 std 6 textio 0 22 zE1`LPoLg^DX3Oz^4Fj1K3
@@ -23,9 +23,9 @@ VT59;F5;MSEE<b?1I[^ZAi3
 !s100 @W9R8=TT9LG7;QMAn3=@[1
 Z8 OV;C;10.5b;63
 32
-Z9 !s110 1618873268
+Z9 !s110 1618961435
 !i10b 1
-Z10 !s108 1618873268.000000
+Z10 !s108 1618961435.000000
 Z11 !s90 -reportprogress|300|decode.vhd|
 Z12 !s107 decode.vhd|
 !i113 1
@@ -38,8 +38,8 @@ R5
 DEx4 work 6 decode 0 22 T59;F5;MSEE<b?1I[^ZAi3
 l59
 L30
-V6hgNS:71IcFGNWd`eFaWk3
-!s100 @Uoc`X_zW<X<04Ge15Y0E1
+VB0Hb@KQ14ibCG:4K8T^Ad1
+!s100 lKPFoKjFRLi13POMlKLfB2
 R8
 32
 R9
@@ -50,7 +50,7 @@ R12
 !i113 1
 R13
 Eexecute
-Z14 w1618862465
+Z14 w1618958885
 R3
 R4
 R5
@@ -63,11 +63,11 @@ Vc7cS?4e7?1OLd36zNFOWL1
 !s100 8dXA;@EGh^Kl;P;Pe_COT3
 R8
 32
-R9
+Z17 !s110 1618961436
 !i10b 1
-R10
-Z17 !s90 -reportprogress|300|execute.vhd|
-Z18 !s107 execute.vhd|
+Z18 !s108 1618961436.000000
+Z19 !s90 -reportprogress|300|execute.vhd|
+Z20 !s107 execute.vhd|
 !i113 1
 R13
 Aalu_arch
@@ -81,24 +81,24 @@ VfjUoHEo5YCYTW<lF1oCcg1
 !s100 4SYzknje42]kRY_mHOz>^2
 R8
 32
-R9
-!i10b 1
-R10
 R17
+!i10b 1
 R18
+R19
+R20
 !i113 1
 R13
 Efetch
-Z19 w1618857999
+R14
 R3
 R2
-Z20 DPx4 ieee 15 std_logic_arith 0 22 [G314=:2zXJ`VORJe1J@Z1
-Z21 DPx4 ieee 18 std_logic_unsigned 0 22 ;eZjO2D4ZDz<]0>8AL<ne1
+Z21 DPx4 ieee 15 std_logic_arith 0 22 [G314=:2zXJ`VORJe1J@Z1
+Z22 DPx4 ieee 18 std_logic_unsigned 0 22 ;eZjO2D4ZDz<]0>8AL<ne1
 R4
 R5
 R0
-Z22 8fetch.vhd
-Z23 Ffetch.vhd
+Z23 8fetch.vhd
+Z24 Ffetch.vhd
 l0
 L9
 Von_;DWk=LZJ1Qc5?BJP_F1
@@ -108,33 +108,33 @@ R8
 R9
 !i10b 1
 R10
-Z24 !s90 -reportprogress|300|fetch.vhd|
-Z25 !s107 fetch.vhd|
+Z25 !s90 -reportprogress|300|fetch.vhd|
+Z26 !s107 fetch.vhd|
 !i113 1
 R13
 Afetch_arch
 R3
 R2
-R20
 R21
+R22
 R4
 R5
 DEx4 work 5 fetch 0 22 on_;DWk=LZJ1Qc5?BJP_F1
-l27
+l28
 L20
-V:OGZf_DV9Y94=nVF[O>i<0
-!s100 iO^5E[K=E73L^:k@9J1`b3
+V5;mZz>F71?]oQ<>mE;9RH0
+!s100 4VjecX^@4_CkEmR2aa2NR1
 R8
 32
 R9
 !i10b 1
 R10
-R24
 R25
+R26
 !i113 1
 R13
 Ememory
-Z26 w1618865736
+R14
 R3
 R2
 R5
@@ -148,9 +148,9 @@ VF[2cFjBfF4<baZSA56ZkU3
 !s100 Ne@3>L1T0]]<E0:gi2SL?2
 R8
 32
-R9
+R17
 !i10b 1
-R10
+R18
 Z29 !s90 -reportprogress|300|memory.vhd|
 Z30 !s107 memory.vhd|
 !i113 1
@@ -163,13 +163,13 @@ R4
 DEx4 work 6 memory 0 22 F[2cFjBfF4<baZSA56ZkU3
 l32
 L22
-V7N[^G:>B]im1Th037InnS0
-!s100 B3G9cWgeAV]kEQ<1;4V;N2
+VBicNKMIo6;VSA2YKNXCYO1
+!s100 :g@1mJGRi??_ee97zJG=50
 R8
 32
-R9
+R17
 !i10b 1
-R10
+R18
 R29
 R30
 !i113 1
@@ -188,9 +188,9 @@ Vkk;22cLiWYeCMBmIW2D]R0
 !s100 XzYK]]oSfzR3PLCj:77jE3
 R8
 32
-R9
+R17
 !i10b 1
-R10
+R18
 Z34 !s90 -reportprogress|300|processor.vhd|
 Z35 !s107 processor.vhd|
 !i113 1
@@ -206,9 +206,9 @@ V7:j2l=ok>^@XFKET5]Vf:3
 !s100 f0l4;H0z8CJ]>Z6=?WZiL3
 R8
 32
-R9
+R17
 !i10b 1
-R10
+R18
 R34
 R35
 !i113 1
@@ -226,9 +226,9 @@ V@ObDA7^2k4_ZE6>iLe61j1
 !s100 >9RfFA4G5ZD@Yfma17bRe2
 R8
 32
-R9
+R17
 !i10b 1
-R10
+R18
 Z39 !s90 -reportprogress|300|processor_testbench.vht|
 Z40 !s107 processor_testbench.vht|
 !i113 1
@@ -243,9 +243,9 @@ Z42 V>h?>HPaZjF]W1f9nLOYf41
 Z43 !s100 BQdZO?n>T_0UYnA]d8UGe1
 R8
 32
-R9
+R17
 !i10b 1
-R10
+R18
 R39
 R40
 !i113 1
