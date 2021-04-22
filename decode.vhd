@@ -39,7 +39,6 @@ ARCHITECTURE decode_arch of decode IS
 	SIGNAL shamt_buffer				: std_logic_vector(4 downto 0);
 	SIGNAL immediate_buffer				: std_logic_vector(31 downto 0);
 	SIGNAL execute_result_available_execute		: std_logic := '0';				-- Whether the instruction presently in the execute stage will have its result available in the execute stage.
-	SIGNAL execute_result_available_memory		: std_logic := '0';				-- Whether the instruction presently in the execute stage will completehave its result available in the memory stage (pretty sure this is always the case).
 	SIGNAL execute_1_use_execute_buffer		: std_logic := '0';
 	SIGNAL execute_2_use_execute_buffer		: std_logic := '0';
 	SIGNAL execute_1_use_memory_buffer		: std_logic := '0';
@@ -83,10 +82,10 @@ BEGIN
 			execute_2_use_execute <= '0';
 			execute_1_use_memory <= '0';
 			execute_2_use_memory <= '0';
-			memory_use_memory <= '0';
-			memory_use_writeback <= '0';
-			memory_read <= '0';
-			memory_write <= '0';
+			memory_use_memory <= memory_use_memory_current_buffer;
+			memory_use_writeback <= memory_use_writeback_current_buffer;
+			memory_read <= memory_read_current_buffer;
+			memory_write <= memory_write_current_buffer;
 			read_data_1 <= x"00000000";
 			read_data_2 <= x"00000000";
 		ELSE
@@ -206,9 +205,6 @@ BEGIN
 							END IF;
 							execute_1_use_execute_buffer <= '0';
 							execute_2_use_execute_buffer <= '0';
-							stall_counter := 1;
-							stalling <= '1';
-							stall_fetch <= '1';
 						ELSE
 							execute_1_use_execute_buffer <= '0';
 							execute_2_use_execute_buffer <= '0';
@@ -320,22 +316,51 @@ BEGIN
 						END IF;
 						IF execute_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000" THEN
 							REPORT "    execute use execute";
-							execute_1_use_execute_buffer <= '1';
-							execute_2_use_execute_buffer <= '0';
-							execute_1_use_memory_buffer <= '0';
-							execute_2_use_memory_buffer <= '0';
+							IF execute_result_available_execute = '1' THEN
+								execute_1_use_execute_buffer <= '1';
+								execute_1_use_memory_buffer <= '0';
+							ELSE
+								-- stall stall stall baby
+								stall_fetch <= '1';
+								stall_counter := 1;
+								stalling <= '1';
+								execute_1_use_execute_buffer <= '0';
+								execute_1_use_memory_buffer <= '1';
+							END IF;
 						ELSIF memory_target = instruction(25 downto 21) AND instruction(25 downto 21) /= "00000" THEN
 							execute_1_use_execute_buffer <= '0';
-							execute_2_use_execute_buffer <= '0';
 							execute_1_use_memory_buffer <= '1';
-							execute_2_use_memory_buffer <= '0';
 						ELSE
 							execute_1_use_execute_buffer <= '0';
-							execute_2_use_execute_buffer <= '0';
 							execute_1_use_memory_buffer <= '0';
-							execute_2_use_memory_buffer <= '0';
 						END IF;
-						execute_result_available_execute <= '1';
+						IF opcode_v = x"05" OR opcode_v = x"04" THEN
+							IF execute_target = instruction(20 downto 16) AND instruction(20 downto 16) /= "00000" THEN
+								REPORT "    execute use execute";
+								IF execute_result_available_execute = '1' THEN
+									execute_2_use_execute_buffer <= '1';
+									execute_2_use_memory_buffer <= '0';
+								ELSE
+									-- stall stall stall baby
+									stall_fetch <= '1';
+									stall_counter := 1;
+									stalling <= '1';
+									execute_2_use_execute_buffer <= '0';
+									execute_2_use_memory_buffer <= '1';
+								END IF;
+							ELSIF memory_target = instruction(20 downto 16) AND instruction(20 downto 16) /= "00000" THEN
+								execute_2_use_execute_buffer <= '0';
+								execute_2_use_memory_buffer <= '1';
+							ELSE
+								execute_2_use_execute_buffer <= '0';
+								execute_2_use_memory_buffer <= '0';
+							END IF;
+							execute_result_available_execute <= '0';
+						ELSE
+							execute_2_use_execute_buffer <= '0';
+							execute_2_use_memory_buffer <= '0';
+							execute_result_available_execute <= '1';
+						END IF;
 						read_data_1_address <= instruction(25 downto 21);
 						read_data_2_address <= instruction(20 downto 16);
 						IF opcode_v = x"04" OR opcode_v = x"05" THEN
@@ -371,6 +396,7 @@ BEGIN
 						memory_use_writeback_delayed_buffer <= '0';
 						read_data_1_address <= "00000";
 						read_data_2_address <= "00000";
+						immediate_buffer <= "000000" & instruction(25 downto 0);
 						IF opcode_v = x"03" THEN
 							execute_target <= "11111";
 						ELSE
