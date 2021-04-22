@@ -9,15 +9,13 @@ ARCHITECTURE behavioural OF memory_testbench IS
 	
 	COMPONENT memory IS
 		PORT (
-			clock				: in std_logic;
-			next_target			: in std_logic_vector(4 downto 0);
-			memory_read			: in std_logic;				-- must read from data memory.
-			memory_write			: in std_logic;				-- must write to data memory.
-			address				: in std_logic_vector(31 downto 0);
-			write_data			: in std_logic_vector(31 downto 0);
-			result				: out std_logic_vector(31 downto 0);
-			result_available		: out std_logic;
-			target				: out std_logic_vector(4 downto 0)	-- target register for hazard detection / forwarding.
+		clock					: in std_logic;
+		memory_read			: in std_logic;				-- must read from data memory.
+		memory_write		: in std_logic;				-- must write to data memory.
+		memory_use_memory 	: in std_logic; --Forwarding control
+		address				: in std_logic_vector(31 downto 0);
+		write_data			: in std_logic_vector(31 downto 0);
+		result				: out std_logic_vector(31 downto 0)
 		);
 	END COMPONENT;
 
@@ -33,6 +31,7 @@ ARCHITECTURE behavioural OF memory_testbench IS
 	SIGNAL mtb_data		: std_logic_vector(31 downto 0) := x"00000000";
 	SIGNAL mtb_result	: std_logic_vector(31 downto 0);
 	SIGNAL mtb_next_target	: std_logic_vector(4 downto 0) := "00000";
+	SIGNAL mtb_mum		: std_logic := '0';
 
 BEGIN
 	
@@ -44,7 +43,7 @@ BEGIN
 		address => mtb_address,
 		write_data => mtb_data,
 		result => mtb_result,
-		next_target => mtb_next_target
+		memory_use_memory => mtb_mum
 	);
 	
 	clock_process: PROCESS BEGIN
@@ -86,6 +85,10 @@ BEGIN
 		mtb_read <= '1';
 		WAIT FOR 1*clock_period;
 		ASSERT mtb_result = x"12341234" REPORt "failed to read initial write of 12341234 to 0x0" SEVERITY FAILURE;
+		mtb_read <= '0';
+
+		WAIT;
+
 	END PROCESS;
 			
 END;
